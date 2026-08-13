@@ -2,8 +2,6 @@
   <img src="./src/assets/logo.png" alt="The Last Website" width="600" />
 </p>
 
-<h1 align="center">The Last Website</h1>
-
 <p align="center"><em>The internet died. One page remained.</em></p>
 
 ---
