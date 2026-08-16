@@ -1,12 +1,13 @@
-import { Canvas } from "@react-three/fiber";
-import PlaceholderCube from "./three/elements/PlaceHolderCube";
+import Prelude from "./scenes/Prelude/Prelude";
 
 export default function App() {
-  return (
-    <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[3, 3, 3]} intensity={1} />
-      <PlaceholderCube />
-    </Canvas>
-  );
+  // `onConnected` is the completion boundary for this scene. When Feed
+  // exists, hook the Prelude -> Feed transition here without touching
+  // Prelude's internals.
+  const handleConnected = () => {
+    // Intentionally left as a no-op for now. Future scope: trigger the
+    // Prelude -> Feed transition.
+  };
+
+  return <Prelude onConnected={handleConnected} />;
 }
