@@ -4,7 +4,8 @@
 // lighting, fog for depth, a rough ground plane, the CRT, debris, and
 // ambient dust. No OrbitControls — this is an authored view.
 
-import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import CRTTerminal from "../../three/elements/CRTTerminal";
 import Debris from "../../three/elements/Debris";
 import Particles from "../../three/elements/Particles";
@@ -18,10 +19,48 @@ function Ground() {
   );
 }
 
+// Ambient light intensities per narrative depth. SIGNAL keeps the
+// machine barely present in the darkness; SYSTEM brings it up as the
+// visual source of the reconstruction; ARCHIVE/LEAVING ease back down
+// as the composition hands weight to the recovered document.
+const AMBIENT_BY_PHASE = {
+  signal: 0.08,
+  resolving: 0.08,
+  system: 0.24,
+  archive: 0.12,
+  leaving: 0.1,
+};
+
+// Eases the scene's ambient light toward the target intensity for the
+// current phase instead of snapping, so the SIGNAL -> SYSTEM wake and the
+// SYSTEM -> ARCHIVE recede read as a slow reconstruction rather than a
+// light switch. Skipped under reduced motion, where the target is applied
+// directly.
+function AmbientLight({ target, reduceMotion }) {
+  const ref = useRef();
+
+  useFrame((_, delta) => {
+    if (!ref.current) return;
+    if (reduceMotion) {
+      ref.current.intensity = target;
+      return;
+    }
+    const lerpSpeed = 1 - Math.pow(0.001, delta);
+    ref.current.intensity += (target - ref.current.intensity) * lerpSpeed;
+  });
+
+  return (
+    <ambientLight ref={ref} intensity={target} color="#243232" />
+  );
+}
+
 export default function PreludeScene({
   reduceMotion = false,
+  phase = "signal",
   terminalLines = [],
 }) {
+  const ambientIntensity = AMBIENT_BY_PHASE[phase] ?? AMBIENT_BY_PHASE.signal;
+
   return (
     <Canvas
       shadows
@@ -41,8 +80,9 @@ export default function PreludeScene({
       {/* Transparent canvas lets the DOM ghost title show through empty space. */}
       <fog attach="fog" args={["#020202", 5, 14]} />
 
-      {/* Enough ambient/rim light to reveal the dark casing silhouette. */}
-      <ambientLight intensity={0.2} color="#243232" />
+      {/* Enough ambient/rim light to reveal the dark casing silhouette.
+          Eases toward each phase's target rather than staying fixed. */}
+      <AmbientLight target={ambientIntensity} reduceMotion={reduceMotion} />
 
       <directionalLight
         position={[-2.5, 4, 2]}
@@ -66,6 +106,7 @@ export default function PreludeScene({
           geometry and attached Html text shrink together. */}
       <CRTTerminal
         position={[0, -0.08, 0]}
+        phase={phase}
         terminalLines={terminalLines}
       />
 

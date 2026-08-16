@@ -12,12 +12,18 @@
 */
 
 :root {
+  /* Cyan retained only for the CRT's own screen glow (a physical light
+     source, not a UI accent). The storyboard's restrained recovery/
+     status accent is amber — used sparingly, e.g. CONNECTION
+     ESTABLISHED — with red reserved strictly for failure states. */
   --cyan: #7fe3e8;
   --cyan-dim: #4a7a7d;
+  --amber: #c98a4b;
+  --amber-dim: #7a5a34;
   --red: #d94b4b;
   --red-dim: #6b3232;
-  --ink-dim: #6b7878;
-  --ink-faint: #3a4444;
+  --ink-dim: #a89b8c;
+  --ink-faint: #5c5347;
 
   /* Role A — system/HUD/machine voice. Unchanged technical monospace. */
   --font-system: "Courier New", "SFMono-Regular", Consolas, Menlo, monospace;
@@ -47,17 +53,26 @@
   user-select: none;
 }
 
-.prelude-root--interference {
-  animation: prelude-interference 0.9s ease-in-out;
+.prelude-root[data-phase="archive"] .prelude-hud,
+.prelude-root[data-phase="leaving"] .prelude-hud {
+  opacity: 0.35;
+  transition: opacity 1.2s ease;
 }
 
-@keyframes prelude-interference {
-  0% { filter: none; }
-  15% { filter: contrast(1.15) brightness(1.08); transform: translateX(1px); }
-  30% { filter: contrast(0.95) brightness(0.95); transform: translateX(-1px); }
-  45% { filter: contrast(1.1); transform: translateX(1px); }
-  60% { filter: brightness(1.15); transform: translateX(0); }
-  100% { filter: none; transform: none; }
+/* Visually hidden, screen-reader only. Carries the actual narrative beats
+   (see PHASE_NARRATION in Prelude.jsx) since the visual frames above are
+   decorative/aria-hidden. Standard clip-based hiding — kept out of the
+   layout entirely, never a target for hover/animation. */
+.prelude-sr-narration {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .prelude-canvas-layer {
@@ -112,32 +127,6 @@
   50%  { transform: translate(1%, -1%); }
   75%  { transform: translate(-1%, -1%); }
   100% { transform: translate(0, 0); }
-}
-
-.prelude-interference-lines {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  opacity: 0;
-}
-
-.prelude-root--interference .prelude-interference-lines {
-  opacity: 0.35;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(127, 227, 232, 0.05) 0px,
-    transparent 2px,
-    transparent 6px,
-    rgba(217, 75, 75, 0.03) 8px,
-    transparent 10px
-  );
-  animation: prelude-interference-drift 0.9s linear;
-}
-
-@keyframes prelude-interference-drift {
-  0%   { background-position-y: 0; }
-  100% { background-position-y: 40px; }
 }
 
 .prelude-vignette {
@@ -238,7 +227,7 @@
 }
 
 .hud-response {
-  color: var(--cyan);
+  color: var(--amber);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -250,13 +239,13 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--cyan);
+  background: var(--amber);
   opacity: 0.6;
 }
 
 .hud-response-dot--active {
   opacity: 1;
-  box-shadow: 0 0 6px var(--cyan);
+  box-shadow: 0 0 6px var(--amber);
 }
 
 .hud-bottom-left {
@@ -309,114 +298,6 @@
   height: 8px;
 }
 
-/* --- Hero: eyebrow + giant title --- */
-
-.prelude-hero {
-  position: absolute;
-  top: 14%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
-  text-align: center;
-  width: 100%;
-  pointer-events: none;
-}
-
-.prelude-eyebrow {
-  font-family: var(--font-system);
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: var(--ink-dim);
-  line-height: 1.8;
-}
-
-.prelude-eyebrow-line--emphasis {
-  color: #cfe0e0;
-  opacity: 0.9;
-}
-
-/* Environmental ghost title. Layered technique instead of flat low-alpha
-   text: a base degraded layer plus a thin corrupted-slice layer offset on
-   top, so the title reads as embedded in the ruined network rather than
-   sitting on it. Both layers share the same box via CSS grid stacking. */
-.prelude-title-wrap {
-  position: relative;
-  margin-top: 28px;
-  display: grid;
-}
-
-.prelude-title,
-.prelude-title-corrupt {
-  grid-area: 1 / 1;
-  font-family: var(--font-display);
-  font-size: clamp(48px, 11vw, 168px);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-}
-
-.prelude-title {
-  color: rgba(120, 150, 150, 0.08);
-  text-shadow: 0 0 40px rgba(127, 227, 232, 0.06);
-  -webkit-mask-image: repeating-linear-gradient(
-    180deg,
-    #000 0px,
-    #000 14px,
-    transparent 14px,
-    transparent 16px,
-    #000 16px,
-    #000 38px,
-    transparent 38px,
-    transparent 41px
-  );
-  mask-image: repeating-linear-gradient(
-    180deg,
-    #000 0px,
-    #000 14px,
-    transparent 14px,
-    transparent 16px,
-    #000 16px,
-    #000 38px,
-    transparent 38px,
-    transparent 41px
-  );
-}
-
-.prelude-title-corrupt {
-  color: rgba(127, 227, 232, 0.05);
-  transform: translateX(3px);
-  -webkit-mask-image: repeating-linear-gradient(
-    180deg,
-    transparent 0px,
-    transparent 22px,
-    #000 22px,
-    #000 24px,
-    transparent 24px,
-    transparent 60px
-  );
-  mask-image: repeating-linear-gradient(
-    180deg,
-    transparent 0px,
-    transparent 22px,
-    #000 22px,
-    #000 24px,
-    transparent 24px,
-    transparent 60px
-  );
-  animation: prelude-title-drift 11s ease-in-out infinite;
-}
-
-@keyframes prelude-title-drift {
-  0%, 100% { transform: translateX(3px); opacity: 0.7; }
-  50%      { transform: translateX(-2px); opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .prelude-title-corrupt {
-    animation: none;
-  }
-}
-
 /* --- Terminal readout (Html-attached to the CRT screen mesh in
        CRTTerminal.jsx — this makes it inherit the screen's position,
        scale, and camera projection instead of sitting at a fixed
@@ -430,6 +311,13 @@
   color: var(--cyan);
   text-shadow: 0 0 8px rgba(127, 227, 232, 0.4);
   pointer-events: none;
+  transition: opacity 1.1s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-terminal-readout {
+    transition: none;
+  }
 }
 
 .crt-terminal-readout-line:first-child {
@@ -452,71 +340,392 @@
   }
 }
 
-/* --- CTA block --- */
+/* --- Shared restrained CTA base, used by all three depth frames --- */
 
-.prelude-cta-block {
-  position: absolute;
-  bottom: 9%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 12;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
-  width: 90%;
-  max-width: 560px;
-}
-
-.prelude-cta {
+.depth-cta {
   background: transparent;
-  border: none;
+  border: 1px solid rgba(120, 150, 150, 0.3);
   font-family: var(--font-system);
-  font-size: 18px;
+  font-size: 14px;
   letter-spacing: 0.1em;
-  color: var(--cyan);
+  color: var(--ink-dim);
   cursor: pointer;
-  padding: 8px 18px;
-  text-shadow: 0 0 10px rgba(127, 227, 232, 0.5);
-  transition: opacity 0.2s ease, text-shadow 0.2s ease;
+  padding: 9px 20px;
+  transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
   pointer-events: auto;
 }
 
-.prelude-cta:hover:not(:disabled) {
-  text-shadow: 0 0 16px rgba(127, 227, 232, 0.8);
+.depth-cta:hover:not(:disabled) {
+  color: #cfe0e0;
+  border-color: rgba(120, 150, 150, 0.55);
 }
 
-.prelude-cta:focus-visible {
-  outline: 1px solid var(--cyan);
+.depth-cta:focus-visible {
+  outline: 1px solid var(--ink-dim);
   outline-offset: 4px;
 }
 
-.prelude-cta--disabled {
-  color: var(--cyan-dim);
+.depth-cta:disabled {
+  color: var(--ink-faint);
+  border-color: rgba(120, 150, 150, 0.14);
   cursor: default;
 }
 
-.prelude-cta--connected {
-  color: var(--cyan);
-  cursor: default;
+/* --- DEPTH 01 — SIGNAL / LAST TRANSMISSION --- */
+
+.signal-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14vh 6% 8%;
 }
 
-.prelude-warning {
+.signal-dump {
+  max-width: 560px;
+  /* Clears the HUD's top-left node/telemetry column (28px + its own
+     width) so the packet dump never overlaps the perimeter HUD. */
+  margin-left: clamp(0px, 12vw, 220px);
+  font-family: var(--font-system);
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--ink-dim);
+}
+
+.signal-line {
+  white-space: pre-wrap;
+  opacity: 0.75;
+}
+
+.signal-line--spacer {
+  height: 10px;
+}
+
+.signal-hex {
+  margin-top: 14px;
+  opacity: 0.4;
+  transition: opacity 0.6s ease;
+}
+
+.signal-hex--active {
+  opacity: 0.7;
+}
+
+.signal-line--hex {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+.signal-fragment {
+  margin-top: 22px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--red-dim);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.signal-fragment--visible {
+  opacity: 0.95;
+  transform: translateY(0);
+}
+
+.signal-cta-block {
+  align-self: center;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-hex,
+  .signal-fragment {
+    transition: none;
+  }
+}
+
+/* --- DEPTH 02 — SYSTEM / BOOT REMNANT --- */
+
+.system-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* Weighted slightly below true center so the recovery text reads as
+     anchored to the CRT's authored screen position (lower-middle of the
+     composition) rather than floating independent of the machine. */
+  padding: 12vh 6% 4vh;
+  text-align: center;
+  pointer-events: none;
+}
+
+.system-recovery {
+  max-width: 560px;
+  font-family: var(--font-system);
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--ink-dim);
+  opacity: 0.8;
+}
+
+.system-line--spacer {
+  height: 8px;
+}
+
+.system-reveal {
+  margin-top: 32px;
+  animation: system-reveal-in 0.9s ease both;
+}
+
+@keyframes system-reveal-in {
+  from { opacity: 0; letter-spacing: 0.3em; }
+  to   { opacity: 1; letter-spacing: 0.06em; }
+}
+
+.system-reveal-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #e7ece9;
+}
+
+.system-reveal-subtext {
+  margin-top: 12px;
+  font-family: var(--font-system);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  color: var(--ink-dim);
+  opacity: 0.85;
+  animation: system-subtext-in 0.8s ease both;
+}
+
+@keyframes system-subtext-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 0.85; transform: translateY(0); }
+}
+
+.system-status {
+  margin-top: 34px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
   font-family: var(--font-system);
   font-size: 11px;
-  line-height: 1.6;
+  letter-spacing: 0.04em;
+  animation: system-status-in 0.7s ease both;
+}
+
+@keyframes system-status-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.system-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-faint);
+}
+
+.system-status-label {
+  min-width: 170px;
+  text-align: left;
+}
+
+.system-status-dots {
+  flex: 1;
+  min-width: 20px;
+}
+
+.system-status-value {
+  color: var(--ink-dim);
+}
+
+.system-status-value--accent {
+  color: var(--amber);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .system-reveal,
+  .system-reveal-subtext,
+  .system-status {
+    animation: none;
+  }
+}
+
+/* --- DEPTH 03 — HUMAN / DEAD ARCHIVE --- */
+
+.archive-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6vh 6% 6%;
+  opacity: 0;
+  animation: archive-frame-in 1.4s ease forwards;
+}
+
+.archive-frame--leaving {
+  animation: archive-frame-out 0.6s ease forwards;
+}
+
+@keyframes archive-frame-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes archive-frame-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.archive-frame-index {
+  align-self: flex-start;
+  max-width: 620px;
+  margin: 0 auto 18px;
+  font-family: var(--font-system);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+}
+
+.archive-index-file {
+  margin-top: 2px;
+  color: var(--ink-dim);
+}
+
+.archive-index-meta {
+  color: var(--ink-faint);
+}
+
+.archive-document {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  padding: 26px 32px 22px;
+  background: rgba(10, 9, 8, 0.4);
+  border: 1px solid rgba(150, 130, 110, 0.16);
+}
+
+.archive-document-header {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+  line-height: 1.8;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(150, 130, 110, 0.14);
+}
+
+.archive-header-label {
+  color: var(--ink-faint);
+  opacity: 0.75;
+}
+
+.archive-document-body {
+  margin-top: 22px;
+  padding-right: 90px;
+}
+
+.archive-body-title {
+  font-family: var(--font-archive);
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+  color: #f1e9df;
+  line-height: 1.25;
+}
+
+.archive-body-subtext {
+  margin-top: 10px;
+  font-family: var(--font-archive);
+  font-size: 16px;
+  color: #d8cdc0;
+  line-height: 1.5;
+}
+
+.archive-body-closing {
+  margin-top: 20px;
+  font-family: var(--font-archive);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-dim);
+  opacity: 0.85;
+}
+
+.archive-body-truncated {
+  font-style: normal;
+  color: var(--ink-faint);
+  opacity: 0.7;
+}
+
+.archive-attachment {
+  position: absolute;
+  top: 26px;
+  right: 32px;
+  width: 64px;
+  text-align: center;
+}
+
+.archive-attachment-box {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(30, 26, 22, 0.6),
+    rgba(30, 26, 22, 0.6) 5px,
+    rgba(18, 16, 14, 0.6) 5px,
+    rgba(18, 16, 14, 0.6) 10px
+  );
+  border: 1px dashed rgba(150, 130, 110, 0.25);
+}
+
+.archive-attachment-label {
+  margin-top: 6px;
+  font-family: var(--font-system);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+
+.archive-attachment-state {
+  font-family: var(--font-system);
+  font-size: 9px;
   color: var(--red-dim);
   opacity: 0.85;
 }
 
-.prelude-thesis {
-  margin-top: 8px;
+.archive-footer-meta {
+  margin-top: 18px;
+  max-width: 620px;
+  width: 100%;
   font-family: var(--font-system);
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--ink-dim);
-  opacity: 0.85;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+  opacity: 0.55;
+  text-align: center;
+}
+
+.archive-cta-block {
+  margin-top: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-frame,
+  .archive-frame--leaving {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 /* --- Archive fragments ---
@@ -909,36 +1118,45 @@
   opacity: 0.7;
 }
 
-/* --- Responsive --- */
+/* --- Responsive ---
+   Desktop is the primary cinematic presentation. Below 900px, peripheral
+   metadata (HUD telemetry, archive footer/index) simplifies rather than
+   shrinking the core narrative text into unreadability. */
 
 @media (max-width: 900px) {
-  .prelude-title,
-  .prelude-title-corrupt {
-    font-size: clamp(36px, 14vw, 90px);
-  }
-
-  .frag-slot--far-upper-right,
-  .frag-slot--left-of-crt,
-  .frag-slot--right,
-  .frag-slot--lower-right-mid {
-    display: none;
-  }
-
   .hud-telemetry {
     display: none;
+  }
+
+  .signal-dump {
+    font-size: 11px;
+  }
+
+  .archive-document {
+    padding: 20px 22px 18px;
+  }
+
+  .archive-document-body {
+    padding-right: 0;
+  }
+
+  .archive-attachment {
+    position: static;
+    margin: 16px 0 0;
+    text-align: left;
+  }
+
+  .archive-frame-index {
+    max-width: 100%;
   }
 }
 
 @media (max-width: 560px) {
-  .prelude-hero {
-    top: 10%;
+  .signal-frame {
+    padding: 12vh 6% 6%;
   }
 
-  .prelude-eyebrow {
-    font-size: 11px;
-  }
-
-  .archive-fragments {
+  .signal-hex {
     display: none;
   }
 
@@ -947,22 +1165,21 @@
     font-size: 9px;
   }
 
-  .boot-log {
+  .hud-bottom-left,
+  .hud-bottom-right {
     display: none;
   }
 
-  .prelude-cta {
-    font-size: 15px;
+  .system-status-label {
+    min-width: 130px;
   }
 
-  .prelude-warning,
-  .prelude-thesis {
-    font-size: 10px;
+  .archive-footer-meta {
+    display: none;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .prelude-root--interference {
-    animation: none;
+  .depth-cta {
+    font-size: 13px;
+    padding: 8px 16px;
   }
 }

@@ -50,9 +50,17 @@ function UserGlyph() {
   );
 }
 
-export default function PreludeHUD({ connectionState }) {
+// Peripheral only — the HUD sets scene atmosphere but must never
+// compete with the active depth frame for attention. It hides its
+// busier telemetry once the visitor moves past SIGNAL, so it recedes
+// the same way the physical HUD-glass of a machine would once you stop
+// staring at the frame around the screen and start reading the screen
+// itself.
+export default function PreludeHUD({ phase }) {
   const [startAt] = useState(() => Date.now());
   const elapsed = useElapsedSeconds(startAt);
+  const isConnected = phase === "system" || phase === "archive" || phase === "leaving";
+  const showTelemetry = phase === "signal" || phase === "resolving";
 
   return (
     <div className="prelude-hud" aria-hidden="true">
@@ -61,14 +69,16 @@ export default function PreludeHUD({ connectionState }) {
         <div className="hud-network">{hud.topLeft.network}</div>
       </div>
 
-      <div className="hud-telemetry">
-        {hud.telemetry.map((row) => (
-          <div key={row.label} className="hud-telemetry-row">
-            <div className="hud-telemetry-label">{row.label}</div>
-            <div className="hud-telemetry-value">{row.value}</div>
-          </div>
-        ))}
-      </div>
+      {showTelemetry && (
+        <div className="hud-telemetry">
+          {hud.telemetry.map((row) => (
+            <div key={row.label} className="hud-telemetry-row">
+              <div className="hud-telemetry-label">{row.label}</div>
+              <div className="hud-telemetry-value">{row.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="hud-top-right">
         <div className="hud-handshake">
@@ -78,7 +88,7 @@ export default function PreludeHUD({ connectionState }) {
           {hud.topRight.response}
           <span
             className={`hud-response-dot${
-              connectionState === "connected" ? " hud-response-dot--active" : ""
+              isConnected ? " hud-response-dot--active" : ""
             }`}
           />
         </div>

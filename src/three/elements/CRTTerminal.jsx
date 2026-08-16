@@ -35,26 +35,64 @@ function CableCurve({ start, end, mid, color = "#0a0a0a", radius = 0.02 }) {
   );
 }
 
+// Screen glow / point-light intensity multipliers per narrative depth.
+// The CRT stays a physical anchor throughout, but only becomes the
+// visual source of the reconstruction during SYSTEM; it recedes again
+// once the human document takes over the composition in ARCHIVE.
+const GLOW_MULTIPLIER_BY_PHASE = {
+  signal: 0.5,
+  resolving: 0.7,
+  system: 1.35,
+  archive: 0.7,
+  leaving: 0.6,
+};
+
+// Readout text opacity per narrative depth — separate from the glow
+// multiplier above. Even as the screen's own light recedes in ARCHIVE,
+// the small idle readout text was staying at full opacity and bleeding
+// through the recovered document. This keeps it legible during SIGNAL/
+// SYSTEM (where it's the only text on the machine) and quiet once the
+// human document becomes the dominant layer.
+const READOUT_OPACITY_BY_PHASE = {
+  signal: 0.85,
+  resolving: 0.85,
+  system: 0.55,
+  archive: 0.14,
+  leaving: 0.1,
+};
+
 export default function CRTTerminal({
   position = [0, 0, 0],
+  phase = "signal",
   terminalLines = [],
 }) {
   const ledRef = useRef();
   const screenLightRef = useRef();
   const screenMatRef = useRef();
+  const targetGlow = GLOW_MULTIPLIER_BY_PHASE[phase] ?? 1;
+  const readoutOpacity = READOUT_OPACITY_BY_PHASE[phase] ?? 1;
+  // Eased, not snapped — the CRT is the physical anchor "waking" and
+  // "receding" across depths, not a value flipping between frames.
+  const glowMultiplierRef = useRef(targetGlow);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const t = clock.getElapsedTime();
     const breathe = 0.5 + Math.sin(t * 0.6) * 0.5;
 
+    const lerpSpeed = 1 - Math.pow(0.001, delta);
+    glowMultiplierRef.current +=
+      (targetGlow - glowMultiplierRef.current) * lerpSpeed;
+    const glowMultiplier = glowMultiplierRef.current;
+
     // Keep the glass almost black. The terminal text should be what reads cyan.
     if (screenMatRef.current) {
-      screenMatRef.current.emissiveIntensity = 0.08 + breathe * 0.05;
+      screenMatRef.current.emissiveIntensity =
+        (0.08 + breathe * 0.05) * glowMultiplier;
     }
 
     // A small local glow is enough to reveal the bezel/casing.
     if (screenLightRef.current) {
-      screenLightRef.current.intensity = 0.22 + breathe * 0.12;
+      screenLightRef.current.intensity = (0.22 + breathe * 0.12) * glowMultiplier;
     }
 
     // Rare, restrained red LED pulse.
@@ -119,7 +157,11 @@ export default function CRTTerminal({
           distanceFactor={1.55}
           style={{ pointerEvents: "none" }}
         >
-          <div className="crt-terminal-readout" aria-hidden="true">
+          <div
+            className="crt-terminal-readout"
+            style={{ opacity: readoutOpacity }}
+            aria-hidden="true"
+          >
             {terminalLines.map((line, i) =>
               line === "_" ? (
                 <div key={i} className="crt-terminal-readout-line">

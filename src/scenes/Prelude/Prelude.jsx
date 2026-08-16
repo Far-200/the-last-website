@@ -1,21 +1,45 @@
 // src/scenes/Prelude/Prelude.jsx
 //
-// Top-level Prelude composition. Owns the idle -> connecting -> connected
-// state machine locally (per current scope: no Zustand/global store for
-// this single interaction). Exposes a single completion boundary —
-// `onConnected` — so a future Feed transition can hook in without any
-// rewrite here.
+// Top-level Prelude composition. Owns the narrative depth sequence —
+// signal -> resolving -> system -> archive -> leaving — as a single
+// GSAP timeline rather than a pile of independent setTimeouts. Each
+// depth excavates one more layer of the story (SIGNAL: the network
+// outside the machine; SYSTEM: the machine's own recovery; HUMAN: the
+// document buried underneath both) instead of exposing all of it at
+// once.
+//
+// `onConnected` remains the single completion boundary for a future
+// Prelude -> Feed transition. It now fires only once the visitor has
+// read the recovered human document and actively chosen to continue
+// past it via [ ENTER ARCHIVE ] — not as soon as the handshake
+// resolves.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import PreludeScene from "./PreludeScene";
 import PreludeHUD from "./PreludeHUD";
-import ArchiveFragments from "./ArchiveFragments";
-import BootLog from "./BootLog";
-import { terminalStates, heroCopy, ctaCopy } from "../../data/terminalCopy";
+import SignalFrame from "./SignalFrame";
+import SystemFrame from "./SystemFrame";
+import ArchiveFrame from "./ArchiveFrame";
+import { terminalStates } from "../../data/terminalCopy";
 import "./prelude.css";
 
-const HANDSHAKE_MS = 1400;
-const INTERFERENCE_MS = 900;
+// The visual frames are decorative/aria-hidden throughout (the storyboard's
+// packet dumps, boot lines, and document chrome are atmosphere, not the
+// literal content a screen reader needs). This one visually-hidden summary
+// per phase keeps the actual narrative beats — the recovered fragment, the
+// reveal, the human document — available non-visually, so "keep the full
+// narrative understandable" holds for keyboard/screen-reader visitors too,
+// not only for prefers-reduced-motion.
+const PHASE_NARRATION = {
+  signal: "A dead network signal. A connect control is available.",
+  resolving: "Connecting. One fragment resolves: \"...GONE.\"",
+  system:
+    "A recovery system wakes. THE INTERNET IS GONE. But something is still moving in the wreckage. Connection established.",
+  archive:
+    "A recovered document from a.kaplan: THE INTERNET IS GONE. But something is still moving in the wreckage. An enter-archive control is available.",
+  leaving: "Entering the archive.",
+};
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(
@@ -35,108 +59,84 @@ function usePrefersReducedMotion() {
 }
 
 export default function Prelude({ onConnected }) {
-  const [connectionState, setConnectionState] = useState("idle"); // idle | connecting | connected
-  const [interference, setInterference] = useState(false);
+  const [phase, setPhase] = useState("signal");
+  const [systemRevealStep, setSystemRevealStep] = useState(0);
   const reduceMotion = usePrefersReducedMotion();
-  const timeouts = useRef([]);
+  const timelineRef = useRef(null);
 
   useEffect(() => {
-    const pending = timeouts.current;
     return () => {
-      pending.forEach(clearTimeout);
+      timelineRef.current?.kill();
     };
   }, []);
 
+  // The resolving -> system -> archive sequence, authored as a single
+  // GSAP timeline of state-setter calls. Durations follow the pacing
+  // guidance (resolve ~1s, system wake ~1.2s, recovery lines ~2.3s,
+  // status ~1s, then hold on archive) but stay tunable in one place.
+  // Under reduced motion, the same phase order plays with short, equal
+  // steps so every state remains reachable and understandable.
+  const runSequence = useCallback(() => {
+    const tl = gsap.timeline();
+    timelineRef.current = tl;
+
+    const step = (fn, duration) => {
+      tl.call(fn);
+      if (duration > 0) tl.to({}, { duration });
+    };
+
+    const d = reduceMotion
+      ? { resolve: 0.15, wake: 0.15, recovery: 0.15, title: 0.15, subtext: 0.15, status: 0.15 }
+      : { resolve: 1.0, wake: 1.2, recovery: 2.3, title: 0.6, subtext: 0.5, status: 0.7 };
+
+    step(() => setPhase("resolving"), d.resolve);
+    step(() => {
+      setPhase("system");
+      setSystemRevealStep(1);
+    }, d.wake + d.recovery);
+    step(() => setSystemRevealStep(2), d.title);
+    step(() => setSystemRevealStep(3), d.subtext);
+    step(() => setSystemRevealStep(4), d.status);
+    step(() => setPhase("archive"), 0);
+  }, [reduceMotion]);
+
   const handleConnect = useCallback(() => {
-    if (connectionState !== "idle") return;
+    if (phase !== "signal") return;
+    runSequence();
+  }, [phase, runSequence]);
 
-    setConnectionState("connecting");
+  const handleEnterArchive = useCallback(() => {
+    if (phase !== "archive") return;
+    setPhase("leaving");
+    onConnected?.();
+  }, [phase, onConnected]);
 
-    const t1 = setTimeout(() => {
-      setInterference(true);
-      const t2 = setTimeout(() => {
-        setInterference(false);
-        setConnectionState("connected");
-        onConnected?.();
-      }, INTERFERENCE_MS);
-      timeouts.current.push(t2);
-    }, HANDSHAKE_MS);
-
-    timeouts.current.push(t1);
-  }, [connectionState, onConnected]);
-
-  const ctaLabel =
-    connectionState === "connected"
-      ? ctaCopy.connected
-      : connectionState === "idle"
-      ? ctaCopy.idle
-      : ctaCopy.connecting;
+  const sceneLines = terminalStates[phase] ?? terminalStates.signal;
 
   return (
-    <div className={`prelude-root${interference && !reduceMotion ? " prelude-root--interference" : ""}`}>
+    <div className="prelude-root" data-phase={phase}>
       <div className="prelude-canvas-layer">
         <PreludeScene
           reduceMotion={reduceMotion}
-          terminalLines={terminalStates[connectionState] ?? terminalStates.idle}
+          phase={phase}
+          terminalLines={sceneLines}
         />
       </div>
 
       <div className="prelude-floor-glow" aria-hidden="true" />
       <div className="prelude-scanlines" aria-hidden="true" />
       <div className="prelude-grain" aria-hidden="true" />
-      <div className="prelude-interference-lines" aria-hidden="true" />
       <div className="prelude-vignette" aria-hidden="true" />
 
-      <PreludeHUD connectionState={connectionState} />
-      <ArchiveFragments />
+      <PreludeHUD phase={phase} />
 
-      <div className="prelude-hero" aria-hidden="true">
-        <div className="prelude-eyebrow">
-          <div className="prelude-eyebrow-line prelude-eyebrow-line--emphasis">
-            {heroCopy.eyebrowLine1}
-          </div>
-          <div className="prelude-eyebrow-line">{heroCopy.eyebrowLine2}</div>
-          <div className="prelude-eyebrow-line">{heroCopy.eyebrowLine3}</div>
-        </div>
-        <div className="prelude-title-wrap">
-          <div className="prelude-title">{heroCopy.title}</div>
-          <div className="prelude-title-corrupt">{heroCopy.title}</div>
-        </div>
-      </div>
+      <p className="prelude-sr-narration" role="status">
+        {PHASE_NARRATION[phase]}
+      </p>
 
-      <BootLog reduceMotion={reduceMotion} />
-
-      <div className="prelude-cta-block">
-        <button
-          type="button"
-          className={`prelude-cta${connectionState !== "idle" ? " prelude-cta--disabled" : ""}${
-            connectionState === "connected" ? " prelude-cta--connected" : ""
-          }`}
-          onClick={handleConnect}
-          disabled={connectionState === "connecting"}
-          aria-label="Click to connect to the last surviving node"
-        >
-          {ctaLabel}
-        </button>
-
-        <p className="prelude-warning">
-          {ctaCopy.warning.split("\n").map((line, i) => (
-            <span key={i}>
-              {line}
-              {i === 0 && <br />}
-            </span>
-          ))}
-        </p>
-
-        <p className="prelude-thesis">
-          {ctaCopy.thesis.split("\n").map((line, i) => (
-            <span key={i}>
-              {line}
-              {i === 0 && <br />}
-            </span>
-          ))}
-        </p>
-      </div>
+      <SignalFrame phase={phase} onConnect={handleConnect} />
+      <SystemFrame phase={phase} revealStep={systemRevealStep} />
+      <ArchiveFrame phase={phase} onEnter={handleEnterArchive} />
     </div>
   );
 }
