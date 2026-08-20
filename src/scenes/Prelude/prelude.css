@@ -59,6 +59,11 @@
   transition: opacity 1.2s ease;
 }
 
+.prelude-root[data-phase="system"] .prelude-hud {
+  opacity: 0.55;
+  transition: opacity 0.8s ease;
+}
+
 /* Visually hidden, screen-reader only. Carries the actual narrative beats
    (see PHASE_NARRATION in Prelude.jsx) since the visual frames above are
    decorative/aria-hidden. Standard clip-based hiding — kept out of the
@@ -175,8 +180,9 @@
   z-index: 10;
   pointer-events: none;
   font-family: var(--font-system);
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.05em;
+  opacity: 0.72;
 }
 
 .hud-top-left {
@@ -350,7 +356,8 @@
   letter-spacing: 0.1em;
   color: var(--ink-dim);
   cursor: pointer;
-  padding: 9px 20px;
+  min-height: 44px;
+  padding: 10px 20px;
   transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
   pointer-events: auto;
 }
@@ -380,18 +387,18 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 14vh 6% 8%;
+  padding: 16vh 6% 7%;
 }
 
 .signal-dump {
-  max-width: 560px;
+  max-width: 500px;
   /* Clears the HUD's top-left node/telemetry column (28px + its own
      width) so the packet dump never overlaps the perimeter HUD. */
   margin-left: clamp(0px, 12vw, 220px);
   font-family: var(--font-system);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.9;
-  color: var(--ink-dim);
+  color: var(--ink-faint);
 }
 
 .signal-line {
@@ -421,9 +428,9 @@
 
 .signal-fragment {
   margin-top: 22px;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.04em;
-  color: var(--red-dim);
+  color: #aa6860;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.6s ease, transform 0.6s ease;
@@ -465,12 +472,22 @@
 }
 
 .system-recovery {
-  max-width: 560px;
+  min-height: 140px;
+  max-width: 520px;
   font-family: var(--font-system);
   font-size: 12px;
   line-height: 1.9;
-  color: var(--ink-dim);
-  opacity: 0.8;
+  color: var(--ink-faint);
+  opacity: 0.62;
+}
+
+.system-line--recovered {
+  animation: system-line-recover 0.45s ease both;
+}
+
+@keyframes system-line-recover {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .system-line--spacer {
@@ -478,8 +495,8 @@
 }
 
 .system-reveal {
-  margin-top: 32px;
-  animation: system-reveal-in 0.9s ease both;
+  margin-top: 18px;
+  animation: system-reveal-in 0.65s ease both;
 }
 
 @keyframes system-reveal-in {
@@ -511,14 +528,17 @@
 }
 
 .system-status {
-  margin-top: 34px;
-  display: inline-flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  max-width: 620px;
   font-family: var(--font-system);
   font-size: 11px;
   letter-spacing: 0.04em;
-  animation: system-status-in 0.7s ease both;
+  opacity: 0.68;
+  animation: system-status-in 0.45s ease both;
 }
 
 @keyframes system-status-in {
@@ -529,18 +549,17 @@
 .system-status-row {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   color: var(--ink-faint);
 }
 
 .system-status-label {
-  min-width: 170px;
-  text-align: left;
+  min-width: auto;
+  text-align: inherit;
 }
 
 .system-status-dots {
-  flex: 1;
-  min-width: 20px;
+  display: none;
 }
 
 .system-status-value {
@@ -552,6 +571,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .system-line--recovered,
   .system-reveal,
   .system-reveal-subtext,
   .system-status {
@@ -589,7 +609,7 @@
 }
 
 .archive-frame-index {
-  align-self: flex-start;
+  width: min(600px, 92vw);
   max-width: 620px;
   margin: 0 auto 18px;
   font-family: var(--font-system);
@@ -610,10 +630,13 @@
 .archive-document {
   position: relative;
   width: 100%;
-  max-width: 620px;
+  max-width: 600px;
   padding: 26px 32px 22px;
-  background: rgba(10, 9, 8, 0.4);
-  border: 1px solid rgba(150, 130, 110, 0.16);
+  transform: translateX(2.5vw);
+  background: linear-gradient(105deg, rgba(10, 9, 8, 0.5), rgba(10, 9, 8, 0.18));
+  border-top: 1px solid rgba(150, 130, 110, 0.16);
+  border-left: 1px solid rgba(150, 130, 110, 0.16);
+  clip-path: polygon(0 0, 96% 0, 100% 9%, 100% 100%, 4% 100%, 0 94%);
 }
 
 .archive-document-header {
@@ -712,8 +735,9 @@
   font-size: 9.5px;
   letter-spacing: 0.02em;
   color: var(--ink-faint);
-  opacity: 0.55;
-  text-align: center;
+  opacity: 0.42;
+  text-align: left;
+  transform: translateX(2.5vw);
 }
 
 .archive-cta-block {
@@ -1134,6 +1158,7 @@
 
   .archive-document {
     padding: 20px 22px 18px;
+    transform: none;
   }
 
   .archive-document-body {
@@ -1148,6 +1173,10 @@
 
   .archive-frame-index {
     max-width: 100%;
+  }
+
+  .archive-footer-meta {
+    transform: none;
   }
 }
 
@@ -1180,6 +1209,110 @@
 
   .depth-cta {
     font-size: 13px;
-    padding: 8px 16px;
+    padding: 10px 16px;
+  }
+}
+
+@media (max-height: 680px) {
+  .hud-bottom-left,
+  .hud-top-right {
+    display: none;
+  }
+
+  .signal-frame {
+    padding-top: 11vh;
+    padding-bottom: 4%;
+  }
+
+  .signal-dump {
+    line-height: 1.55;
+  }
+
+  .system-frame {
+    padding-top: 5vh;
+  }
+
+  .system-recovery {
+    min-height: 108px;
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+
+  .system-reveal,
+  .system-status,
+  .archive-document-body,
+  .archive-cta-block {
+    margin-top: 14px;
+  }
+
+  .archive-frame {
+    padding-top: 3vh;
+    padding-bottom: 3%;
+  }
+
+  .archive-document {
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+
+  .archive-document-header {
+    line-height: 1.5;
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-top-left,
+  .archive-frame-index,
+  .archive-footer-meta,
+  .archive-attachment {
+    display: none;
+  }
+
+  .signal-frame {
+    padding-top: 6vh;
+  }
+
+  .signal-dump {
+    margin-left: 0;
+    max-width: 46vw;
+    font-size: 9px;
+  }
+
+  .signal-line--spacer,
+  .system-line--spacer {
+    height: 4px;
+  }
+
+  .system-frame {
+    padding: 2vh 4%;
+  }
+
+  .system-recovery {
+    min-height: 76px;
+    font-size: 9px;
+    line-height: 1.35;
+  }
+
+  .system-reveal-title {
+    font-size: clamp(24px, 7vh, 34px);
+  }
+
+  .system-reveal-subtext,
+  .system-status {
+    margin-top: 8px;
+  }
+
+  .archive-frame {
+    padding: 2vh 4%;
+  }
+
+  .archive-document {
+    max-width: 72vw;
+  }
+
+  .archive-document-body,
+  .archive-body-closing {
+    margin-top: 8px;
   }
 }

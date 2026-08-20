@@ -54,6 +54,28 @@ function AmbientLight({ target, reduceMotion }) {
   );
 }
 
+const CAMERA_BY_PHASE = {
+  signal: [0, 1.85, 6.2],
+  resolving: [0, 1.85, 6.14],
+  system: [0, 1.82, 6.04],
+  archive: [0.04, 1.88, 6.24],
+  leaving: [0.04, 1.88, 6.28],
+};
+
+function CameraResponse({ phase, reduceMotion }) {
+  const target = CAMERA_BY_PHASE[phase] ?? CAMERA_BY_PHASE.signal;
+
+  useFrame(({ camera }, delta) => {
+    const amount = reduceMotion ? 1 : 1 - Math.pow(0.01, delta);
+    camera.position.x += (target[0] - camera.position.x) * amount;
+    camera.position.y += (target[1] - camera.position.y) * amount;
+    camera.position.z += (target[2] - camera.position.z) * amount;
+    camera.lookAt(0, 0.78, 0);
+  });
+
+  return null;
+}
+
 export default function PreludeScene({
   reduceMotion = false,
   phase = "signal",
@@ -79,6 +101,7 @@ export default function PreludeScene({
     >
       {/* Transparent canvas lets the DOM ghost title show through empty space. */}
       <fog attach="fog" args={["#020202", 5, 14]} />
+      <CameraResponse phase={phase} reduceMotion={reduceMotion} />
 
       {/* Enough ambient/rim light to reveal the dark casing silhouette.
           Eases toward each phase's target rather than staying fixed. */}
@@ -108,6 +131,7 @@ export default function PreludeScene({
         position={[0, -0.08, 0]}
         phase={phase}
         terminalLines={terminalLines}
+        reduceMotion={reduceMotion}
       />
 
       <Debris />

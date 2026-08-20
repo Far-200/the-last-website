@@ -8,13 +8,19 @@
 // This frame holds once visible — it does not advance on its own. The
 // visitor activates [ ENTER ARCHIVE ] to complete the Prelude.
 
+import { useEffect, useRef } from "react";
 import { archiveCopy } from "../../data/terminalCopy";
 
 export default function ArchiveFrame({ phase, onEnter }) {
+  const ctaRef = useRef(null);
   const isActive = phase === "archive" || phase === "leaving";
-  if (!isActive) return null;
-
   const isLeaving = phase === "leaving";
+
+  useEffect(() => {
+    if (phase === "archive") ctaRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+
+  if (!isActive) return null;
 
   return (
     <div
@@ -77,6 +83,7 @@ export default function ArchiveFrame({ phase, onEnter }) {
       <div className="archive-cta-block">
         <button
           type="button"
+          ref={ctaRef}
           className="depth-cta archive-cta"
           onClick={onEnter}
           aria-label="Enter the archive"

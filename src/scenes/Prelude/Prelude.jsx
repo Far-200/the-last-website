@@ -86,17 +86,35 @@ export default function Prelude({ onConnected }) {
     };
 
     const d = reduceMotion
-      ? { resolve: 0.15, wake: 0.15, recovery: 0.15, title: 0.15, subtext: 0.15, status: 0.15 }
-      : { resolve: 1.0, wake: 1.2, recovery: 2.3, title: 0.6, subtext: 0.5, status: 0.7 };
+      ? {
+          resolve: 0.7,
+          wake: 0.9,
+          recovery: 1.25,
+          title: 1.65,
+          subtext: 1.35,
+          status: 1.75,
+          hold: 1.8,
+        }
+      : {
+          resolve: 1,
+          wake: 0.7,
+          recovery: 1.05,
+          title: 0.9,
+          subtext: 0.7,
+          status: 0.85,
+          hold: 1.25,
+        };
 
     step(() => setPhase("resolving"), d.resolve);
     step(() => {
       setPhase("system");
       setSystemRevealStep(1);
-    }, d.wake + d.recovery);
-    step(() => setSystemRevealStep(2), d.title);
-    step(() => setSystemRevealStep(3), d.subtext);
-    step(() => setSystemRevealStep(4), d.status);
+    }, d.wake);
+    step(() => setSystemRevealStep(2), d.recovery);
+    step(() => setSystemRevealStep(3), d.title);
+    step(() => setSystemRevealStep(4), d.subtext);
+    step(() => setSystemRevealStep(5), d.status);
+    step(() => undefined, d.hold);
     step(() => setPhase("archive"), 0);
   }, [reduceMotion]);
 
@@ -108,8 +126,11 @@ export default function Prelude({ onConnected }) {
   const handleEnterArchive = useCallback(() => {
     if (phase !== "archive") return;
     setPhase("leaving");
-    onConnected?.();
-  }, [phase, onConnected]);
+
+    const tl = gsap.timeline({ onComplete: () => onConnected?.() });
+    timelineRef.current = tl;
+    tl.to({}, { duration: reduceMotion ? 0.05 : 0.65 });
+  }, [phase, onConnected, reduceMotion]);
 
   const sceneLines = terminalStates[phase] ?? terminalStates.signal;
 

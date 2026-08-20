@@ -1,66 +1,14 @@
 // src/scenes/Prelude/PreludeHUD.jsx
 //
-// Restrained archival HUD around the perimeter: node/network status,
-// telemetry, handshake timer, area index, active user. All decorative
-// (aria-hidden) — none of this is required for the primary interaction.
+// Sparse archival HUD around the perimeter: node/network status, one
+// response indicator, and the area index. All decorative (aria-hidden).
 
-import { useEffect, useState } from "react";
 import { hud } from "../../data/terminalCopy";
 
-function useElapsedSeconds(startAt) {
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startAt) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [startAt]);
-
-  return elapsed;
-}
-
-function formatClock(totalSeconds) {
-  const base = 17; // matches the reference's "00:00:17 AGO" starting point
-  const s = base + totalSeconds;
-  const mm = Math.floor(s / 60)
-    .toString()
-    .padStart(2, "0");
-  const ss = (s % 60).toString().padStart(2, "0");
-  return `00:${mm}:${ss}`;
-}
-
-function UserGlyph() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M4 20c0-4 3.5-6 8-6s8 2 8 6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-// Peripheral only — the HUD sets scene atmosphere but must never
-// compete with the active depth frame for attention. It hides its
-// busier telemetry once the visitor moves past SIGNAL, so it recedes
-// the same way the physical HUD-glass of a machine would once you stop
-// staring at the frame around the screen and start reading the screen
-// itself.
+// Peripheral only — enough recovery-system evidence to establish context,
+// without surrounding the physical CRT with a telemetry dashboard.
 export default function PreludeHUD({ phase }) {
-  const [startAt] = useState(() => Date.now());
-  const elapsed = useElapsedSeconds(startAt);
   const isConnected = phase === "system" || phase === "archive" || phase === "leaving";
-  const showTelemetry = phase === "signal" || phase === "resolving";
 
   return (
     <div className="prelude-hud" aria-hidden="true">
@@ -69,21 +17,7 @@ export default function PreludeHUD({ phase }) {
         <div className="hud-network">{hud.topLeft.network}</div>
       </div>
 
-      {showTelemetry && (
-        <div className="hud-telemetry">
-          {hud.telemetry.map((row) => (
-            <div key={row.label} className="hud-telemetry-row">
-              <div className="hud-telemetry-label">{row.label}</div>
-              <div className="hud-telemetry-value">{row.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="hud-top-right">
-        <div className="hud-handshake">
-          {hud.topRight.handshake} {formatClock(elapsed)} AGO
-        </div>
         <div className="hud-response">
           {hud.topRight.response}
           <span
@@ -95,14 +29,6 @@ export default function PreludeHUD({ phase }) {
       </div>
 
       <div className="hud-bottom-left">{hud.bottomLeft}</div>
-
-      <div className="hud-bottom-right">
-        <div className="hud-user-text">
-          <div className="hud-user-label">{hud.bottomRight.label}</div>
-          <div className="hud-user-id">{hud.bottomRight.id}</div>
-        </div>
-        <UserGlyph />
-      </div>
     </div>
   );
 }

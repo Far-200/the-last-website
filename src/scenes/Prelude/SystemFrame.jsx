@@ -13,32 +13,39 @@
 
 import { systemCopy } from "../../data/terminalCopy";
 
+const WAKE_LINE_COUNT = 4;
+
 // Reveal steps, in order:
 //   0 — nothing yet
-//   1 — recovery lines
-//   2 — + title reveal ("THE INTERNET IS GONE.")
-//   3 — + quiet subtext
-//   4 — + status block (VOLUME LABEL ... CONNECTION ESTABLISHED)
+//   1 — machine wake fragment
+//   2 — remaining recovery fragments
+//   3 — title reveal ("THE INTERNET IS GONE.")
+//   4 — quiet subtext
+//   5 — subordinate status evidence
 export default function SystemFrame({ phase, revealStep = 0 }) {
   if (phase !== "system") return null;
 
   return (
     <div className="system-frame" aria-hidden="true">
       <div className="system-recovery">
-        {systemCopy.recoveryLines.map((line, i) => (
+        {systemCopy.recoveryLines
+          .slice(0, revealStep >= 2 ? undefined : WAKE_LINE_COUNT)
+          .map((line, i) => (
           <div
             key={i}
-            className={`system-line${line === "" ? " system-line--spacer" : ""}`}
+            className={`system-line system-line--recovered${
+              line === "" ? " system-line--spacer" : ""
+            }`}
           >
             {line}
           </div>
-        ))}
+          ))}
       </div>
 
-      {revealStep >= 2 && (
+      {revealStep >= 3 && (
         <div className="system-reveal">
           <div className="system-reveal-title">{systemCopy.revealTitle}</div>
-          {revealStep >= 3 && (
+          {revealStep >= 4 && (
             <div className="system-reveal-subtext">
               {systemCopy.revealSubtext}
             </div>
@@ -46,7 +53,7 @@ export default function SystemFrame({ phase, revealStep = 0 }) {
         </div>
       )}
 
-      {revealStep >= 4 && (
+      {revealStep >= 5 && (
         <div className="system-status">
           {systemCopy.statusLines.map((row) => (
             <div key={row.label} className="system-status-row">

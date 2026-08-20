@@ -65,6 +65,7 @@ export default function CRTTerminal({
   position = [0, 0, 0],
   phase = "signal",
   terminalLines = [],
+  reduceMotion = false,
 }) {
   const ledRef = useRef();
   const screenLightRef = useRef();
@@ -77,9 +78,9 @@ export default function CRTTerminal({
 
   useFrame(({ clock }, delta) => {
     const t = clock.getElapsedTime();
-    const breathe = 0.5 + Math.sin(t * 0.6) * 0.5;
+    const breathe = reduceMotion ? 0.5 : 0.5 + Math.sin(t * 0.6) * 0.5;
 
-    const lerpSpeed = 1 - Math.pow(0.001, delta);
+    const lerpSpeed = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
     glowMultiplierRef.current +=
       (targetGlow - glowMultiplierRef.current) * lerpSpeed;
     const glowMultiplier = glowMultiplierRef.current;
@@ -97,7 +98,7 @@ export default function CRTTerminal({
 
     // Rare, restrained red LED pulse.
     if (ledRef.current) {
-      const pulse = Math.max(0, Math.sin(t * 0.35));
+      const pulse = reduceMotion ? 0 : Math.max(0, Math.sin(t * 0.35));
       ledRef.current.material.emissiveIntensity = 0.25 + pulse * 0.9;
     }
   });
