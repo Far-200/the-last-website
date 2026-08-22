@@ -147,15 +147,21 @@
 }
 
 /* Faint floor glow anchoring the CRT physically in the space. Sits above
-   the canvas layer, below the vignette, purely additive. */
+   the canvas layer, below the vignette, purely additive. Was previously
+   unconditional (no phase gating at all), which left this cyan gradient
+   visible identically through every phase, including sitting behind the
+   ARCHIVE document. It recedes once the human document takes over, same
+   phase boundary and same rationale as the CRT's own glow in
+   CRTTerminal.jsx, reusing the [data-phase] override pattern already
+   established below for .prelude-hud rather than a new mechanism. */
 .prelude-floor-glow {
   position: absolute;
-  left: 50%;
+  left: 72%;
   bottom: 0;
   z-index: 4;
-  width: 900px;
-  max-width: 130vw;
-  height: 40%;
+  width: 760px;
+  max-width: 110vw;
+  height: 34%;
   transform: translateX(-50%);
   pointer-events: none;
   background: radial-gradient(
@@ -164,6 +170,12 @@
     rgba(80, 130, 130, 0.02) 35%,
     transparent 70%
   );
+  transition: opacity 1.2s ease;
+}
+
+.prelude-root[data-phase="archive"] .prelude-floor-glow,
+.prelude-root[data-phase="leaving"] .prelude-floor-glow {
+  opacity: 0.2;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -308,43 +320,6 @@
        CRTTerminal.jsx — this makes it inherit the screen's position,
        scale, and camera projection instead of sitting at a fixed
        viewport coordinate) --- */
-
-.crt-terminal-readout {
-  width: 220px;
-  font-family: var(--font-system);
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--cyan);
-  text-shadow: 0 0 8px rgba(127, 227, 232, 0.4);
-  pointer-events: none;
-  transition: opacity 1.1s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .crt-terminal-readout {
-    transition: none;
-  }
-}
-
-.crt-terminal-readout-line:first-child {
-  color: #cdf3f5;
-}
-
-.crt-terminal-cursor {
-  animation: cursor-blink 1.1s steps(1) infinite;
-}
-
-@keyframes cursor-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .crt-terminal-cursor {
-    animation: none;
-    opacity: 1;
-  }
-}
 
 /* --- Shared restrained CTA base, used by all three depth frames --- */
 

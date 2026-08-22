@@ -3,6 +3,16 @@
 // The Three.js layer of the Prelude: fixed cinematic camera, restrained
 // lighting, fog for depth, a rough ground plane, the CRT, debris, and
 // ambient dust. No OrbitControls — this is an authored view.
+//
+// SIGNAL framing note: the CRT used to sit at the origin, facing the
+// camera head-on, with the camera's look-at point landing exactly on its
+// screen. That made the screen the compositional subject and turned it
+// into a small, centred, cyan rectangle. It is now turned roughly 60°
+// away and pushed into the right third, so the camera sees the machine
+// at a grazing angle — casing and silhouette, not a presented display.
+// The look-at point is empty dark space between the packet-capture text
+// (left) and the machine (right), which is the correct subject for a
+// depth about the signal outside the machine.
 
 import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -10,11 +20,15 @@ import CRTTerminal from "../../three/elements/CRTTerminal";
 import Debris from "../../three/elements/Debris";
 import Particles from "../../three/elements/Particles";
 
+// Metalness dropped from 0.35 to 0.08 and the base value lifted a touch:
+// a metallic floor has almost no diffuse response, so the CRT's spill
+// light had nothing to pool on. This is now a rough dielectric surface
+// that actually catches the screen glow.
 function Ground() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
       <planeGeometry args={[30, 30]} />
-      <meshStandardMaterial color="#050505" roughness={0.85} metalness={0.35} />
+      <meshStandardMaterial color="#0a0c0c" roughness={0.92} metalness={0.08} />
     </mesh>
   );
 }
@@ -62,6 +76,11 @@ const CAMERA_BY_PHASE = {
   leaving: [0.04, 1.88, 6.28],
 };
 
+// Empty dark space, deliberately not the machine. Kept as one constant so
+// the Canvas's initial framing and the per-frame response can never drift
+// apart.
+const LOOK_AT = [0.3, 0.72, 0];
+
 function CameraResponse({ phase, reduceMotion }) {
   const target = CAMERA_BY_PHASE[phase] ?? CAMERA_BY_PHASE.signal;
 
@@ -70,17 +89,13 @@ function CameraResponse({ phase, reduceMotion }) {
     camera.position.x += (target[0] - camera.position.x) * amount;
     camera.position.y += (target[1] - camera.position.y) * amount;
     camera.position.z += (target[2] - camera.position.z) * amount;
-    camera.lookAt(0, 0.78, 0);
+    camera.lookAt(...LOOK_AT);
   });
 
   return null;
 }
 
-export default function PreludeScene({
-  reduceMotion = false,
-  phase = "signal",
-  terminalLines = [],
-}) {
+export default function PreludeScene({ reduceMotion = false, phase = "signal" }) {
   const ambientIntensity = AMBIENT_BY_PHASE[phase] ?? AMBIENT_BY_PHASE.signal;
 
   return (
@@ -89,9 +104,7 @@ export default function PreludeScene({
       dpr={[1, 1.75]}
       camera={{ position: [0, 1.85, 6.2], fov: 42 }}
       onCreated={({ camera }) => {
-        // Explicit authored framing: look slightly below the monitor center
-        // so the CRT sits in the lower-middle of the composition.
-        camera.lookAt(0, 0.78, 0);
+        camera.lookAt(...LOOK_AT);
       }}
       gl={{
         antialias: true,
@@ -109,7 +122,7 @@ export default function PreludeScene({
 
       <directionalLight
         position={[-2.5, 4, 2]}
-        intensity={0.34}
+        intensity={0.5}
         color="#465d5d"
         castShadow
         shadow-mapSize={[1024, 1024]}
@@ -125,12 +138,14 @@ export default function PreludeScene({
 
       <Ground />
 
-      {/* Slightly lowered; scale is handled inside CRTTerminal so all of its
-          geometry and attached Html text shrink together. */}
+      {/* Off-centre and turned ~60° away from the view axis. At this
+          angle the screen plane presents as a thin sliver rather than a
+          face-on rectangle, and its glow reaches the composition only as
+          spill on the floor. Scale is handled inside CRTTerminal. */}
       <CRTTerminal
-        position={[0, -0.08, 0]}
+        position={[2.3, -0.08, -0.4]}
+        rotation={[0, 1.05, 0]}
         phase={phase}
-        terminalLines={terminalLines}
         reduceMotion={reduceMotion}
       />
 

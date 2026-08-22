@@ -6,26 +6,13 @@
 //
 // The Prelude now excavates in three depths — SIGNAL, SYSTEM, HUMAN —
 // rather than exposing everything at once. Each depth owns its own copy
-// block below. `terminalStates` (CRT screen readout) is keyed by the
-// same phase names as the state machine in Prelude.jsx.
-
-// --- CRT screen readout, per phase -----------------------------------
-// SIGNAL: the machine barely exists yet, so the screen stays near-blank.
-// SYSTEM: this is where the boot-remnant text actually lives.
-// ARCHIVE / LEAVING: the CRT recedes, so the readout goes quiet again.
-export const terminalStates = {
-  signal: ["last://connection", "", "_"],
-  resolving: ["last://connection", "", "checksum stabilizing...", "_"],
-  system: [
-    "inbound handshake wakes",
-    "local recovery process...",
-    "",
-    "mounting /srv/the_last_website",
-    "........ OK (read-only)",
-  ],
-  archive: ["last://connection", "", "session held open."],
-  leaving: ["last://connection", "", "session held open."],
-};
+// block below.
+//
+// There is deliberately no per-phase CRT screen readout here any more.
+// It used to be transform-mapped onto the CRT glass as DOM text, which
+// is what made the machine read as a small cyan UI panel at screen
+// centre — see the redesign note in three/elements/CRTTerminal.jsx. The
+// terminal's voice now lives entirely in the depth frames below.
 
 // --- DEPTH 01 — SIGNAL / LAST TRANSMISSION ----------------------------
 // Restrained packet-capture language. Nothing here reveals the human
@@ -81,6 +68,14 @@ export const systemCopy = {
 // --- DEPTH 03 — HUMAN / DEAD ARCHIVE -----------------------------------
 // One recovered document, not a cloud of fragments. Machine chrome is
 // reduced to a metadata footnote beneath it.
+//
+// The headline is deliberately NOT a repeat of systemCopy.revealTitle —
+// SYSTEM already delivered "THE INTERNET IS GONE." as the cold machine
+// fact; this document is the voice shift that follows it, machine fact
+// to human evidence. bodySubtext/bodyClosing are left empty rather than
+// filled with new invented lines: the recovered note is the opening
+// address and then nothing — data loss, not a continued sentence —
+// which is what bodyTruncated marks.
 export const archiveCopy = {
   indexLine: "index of /archive/recovered/",
   fileLine: "→ the_last_website.html",
@@ -88,9 +83,9 @@ export const archiveCopy = {
   from: "a.kaplan",
   date: "2019-Apr-17 03:44 (partial)",
   subject: "(untitled)",
-  bodyTitle: "THE INTERNET IS GONE.",
-  bodySubtext: "but something is still moving in the wreckage.",
-  bodyClosing: "if anyone finds this— ",
+  bodyTitle: "IF ANYONE FINDS THIS—",
+  bodySubtext: "",
+  bodyClosing: "",
   bodyTruncated: "[truncated]",
   attachmentName: "photo.jpg",
   attachmentState: "corrupted",

@@ -21,7 +21,6 @@ import PreludeHUD from "./PreludeHUD";
 import SignalFrame from "./SignalFrame";
 import SystemFrame from "./SystemFrame";
 import ArchiveFrame from "./ArchiveFrame";
-import { terminalStates } from "../../data/terminalCopy";
 import "./prelude.css";
 
 // The visual frames are decorative/aria-hidden throughout (the storyboard's
@@ -37,7 +36,7 @@ const PHASE_NARRATION = {
   system:
     "A recovery system wakes. THE INTERNET IS GONE. But something is still moving in the wreckage. Connection established.",
   archive:
-    "A recovered document from a.kaplan: THE INTERNET IS GONE. But something is still moving in the wreckage. An enter-archive control is available.",
+    "A recovered document from a.kaplan: \"IF ANYONE FINDS THIS—\" The rest is unrecoverable. An enter-archive control is available.",
   leaving: "Entering the archive.",
 };
 
@@ -132,16 +131,10 @@ export default function Prelude({ onConnected }) {
     tl.to({}, { duration: reduceMotion ? 0.05 : 0.65 });
   }, [phase, onConnected, reduceMotion]);
 
-  const sceneLines = terminalStates[phase] ?? terminalStates.signal;
-
   return (
     <div className="prelude-root" data-phase={phase}>
       <div className="prelude-canvas-layer">
-        <PreludeScene
-          reduceMotion={reduceMotion}
-          phase={phase}
-          terminalLines={sceneLines}
-        />
+        <PreludeScene reduceMotion={reduceMotion} phase={phase} />
       </div>
 
       <div className="prelude-floor-glow" aria-hidden="true" />

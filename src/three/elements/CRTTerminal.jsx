@@ -1,12 +1,35 @@
 // src/three/elements/CRTTerminal.jsx
 //
 // Stylized CRT computer built from primitives.
-// Surgical visual pass: keep the machine dark and physical, while making
-// the text — not the entire screen plane — carry the cyan emphasis.
+//
+// SIGNAL presentation redesign
+// ---------------------------
+// The screen previously read as a miniature cyan monitor at screen
+// centre, and that was built by four things at once — no material value
+// could have removed it:
+//
+//   1. A `<Html transform>` readout painted the glass with a 220px block
+//      of `var(--cyan)` DOM text plus a cyan text-shadow. DOM bypasses
+//      fog, lighting and tone mapping entirely, so it rendered at full
+//      CSS brightness however dark the scene got.
+//   2. The glass was a flat, camera-facing, uniformly emissive plane —
+//      the definition of "a rectangle of even value".
+//   3. A cyan point light in front of the screen flooded the flat front
+//      faces of the bezel and casing boxes evenly, outlining a second,
+//      larger rectangle.
+//   4. PreludeScene's `lookAt(0, 0.78, 0)` put the glass on the exact
+//      look-at point, and it was the only lit thing in frame.
+//
+// The machine is now a physical object seen at a grazing angle (see the
+// rotation PreludeScene gives it): the glass carries essentially no
+// emissive of its own, the readout DOM is gone, and the only cyan the
+// composition shows is the spill the screen throws down onto the floor
+// plus a kiss of light on the near bezel edge. Cyan still means "CRT
+// physical screen glow" and nothing else — it just never resolves into a
+// readable panel.
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import * as THREE from "three";
 
 const CASING_COLOR = "#222526";
@@ -35,68 +58,80 @@ function CableCurve({ start, end, mid, color = "#0a0a0a", radius = 0.02 }) {
   );
 }
 
-// Screen glow / point-light intensity multipliers per narrative depth.
-// The CRT stays a physical anchor throughout, but only becomes the
-// visual source of the reconstruction during SYSTEM; it recedes again
-// once the human document takes over the composition in ARCHIVE.
+// The screen is only genuinely alive in these two phases. SIGNAL is the
+// source being connected to; RESOLVING is where it visibly dies as the
+// connection/recovery transition begins. From SYSTEM onward the screen
+// must be dead: every cyan-emitting source below is hard-set to exactly
+// 0 every frame rather than eased toward 0, because an exponential ease
+// only ever approaches zero asymptotically and left a faint but real
+// residue behind SYSTEM/ARCHIVE content.
+const SCREEN_DEAD_PHASES = new Set(["system", "archive", "leaving"]);
+
+// Glow multiplier while the screen is still alive. `resolving` is
+// deliberately lower than `signal` — the visible dying beat — rather
+// than dropping straight to the SCREEN_DEAD_PHASES hard zero.
 const GLOW_MULTIPLIER_BY_PHASE = {
   signal: 0.5,
-  resolving: 0.7,
-  system: 1.35,
-  archive: 0.7,
-  leaving: 0.6,
-};
-
-// Readout text opacity per narrative depth — separate from the glow
-// multiplier above. Even as the screen's own light recedes in ARCHIVE,
-// the small idle readout text was staying at full opacity and bleeding
-// through the recovered document. This keeps it legible during SIGNAL/
-// SYSTEM (where it's the only text on the machine) and quiet once the
-// human document becomes the dominant layer.
-const READOUT_OPACITY_BY_PHASE = {
-  signal: 0.85,
-  resolving: 0.85,
-  system: 0.55,
-  archive: 0.14,
-  leaving: 0.1,
+  resolving: 0.2,
 };
 
 export default function CRTTerminal({
   position = [0, 0, 0],
+  rotation = [0, 0, 0],
   phase = "signal",
-  terminalLines = [],
   reduceMotion = false,
 }) {
   const ledRef = useRef();
-  const screenLightRef = useRef();
+  const spillLightRef = useRef();
+  const bezelLightRef = useRef();
   const screenMatRef = useRef();
-  const targetGlow = GLOW_MULTIPLIER_BY_PHASE[phase] ?? 1;
-  const readoutOpacity = READOUT_OPACITY_BY_PHASE[phase] ?? 1;
-  // Eased, not snapped — the CRT is the physical anchor "waking" and
-  // "receding" across depths, not a value flipping between frames.
+  const isDead = SCREEN_DEAD_PHASES.has(phase);
+  const targetGlow = isDead ? 0 : GLOW_MULTIPLIER_BY_PHASE[phase] ?? 1;
+  // Eased, not snapped, while alive — the CRT is the physical anchor
+  // waking and dying, not a value flipping between frames.
   const glowMultiplierRef = useRef(targetGlow);
 
   useFrame(({ clock }, delta) => {
     const t = clock.getElapsedTime();
-    const breathe = reduceMotion ? 0.5 : 0.5 + Math.sin(t * 0.6) * 0.5;
 
-    const lerpSpeed = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
-    glowMultiplierRef.current +=
-      (targetGlow - glowMultiplierRef.current) * lerpSpeed;
-    const glowMultiplier = glowMultiplierRef.current;
+    if (isDead) {
+      // Hard zero, no easing — see SCREEN_DEAD_PHASES above.
+      if (screenMatRef.current) screenMatRef.current.emissiveIntensity = 0;
+      if (spillLightRef.current) spillLightRef.current.intensity = 0;
+      if (bezelLightRef.current) bezelLightRef.current.intensity = 0;
+      glowMultiplierRef.current = 0;
+    } else {
+      const breathe = reduceMotion ? 0.5 : 0.5 + Math.sin(t * 0.6) * 0.5;
+      const lerpSpeed = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
+      glowMultiplierRef.current +=
+        (targetGlow - glowMultiplierRef.current) * lerpSpeed;
+      const glowMultiplier = glowMultiplierRef.current;
 
-    // Keep the glass almost black. The terminal text should be what reads cyan.
-    if (screenMatRef.current) {
-      screenMatRef.current.emissiveIntensity =
-        (0.08 + breathe * 0.05) * glowMultiplier;
+      // The glass itself stays essentially unlit. It is seen almost
+      // edge-on anyway; the point is that even head-on it would never
+      // read as a filled panel.
+      if (screenMatRef.current) {
+        screenMatRef.current.emissiveIntensity =
+          (0.02 + breathe * 0.015) * glowMultiplier;
+      }
+
+      // The actual visible cyan: a soft pool thrown down onto the floor
+      // in front of the machine. Light on a rough surface, not an
+      // emitting rectangle.
+      if (spillLightRef.current) {
+        spillLightRef.current.intensity = (0.5 + breathe * 0.26) * glowMultiplier;
+      }
+
+      // A very short-range light that only reaches the near bezel edge,
+      // so the machine's silhouette stays legible without its front
+      // faces being flooded into a lit rectangle.
+      if (bezelLightRef.current) {
+        bezelLightRef.current.intensity = (0.1 + breathe * 0.06) * glowMultiplier;
+      }
     }
 
-    // A small local glow is enough to reveal the bezel/casing.
-    if (screenLightRef.current) {
-      screenLightRef.current.intensity = (0.22 + breathe * 0.12) * glowMultiplier;
-    }
-
-    // Rare, restrained red LED pulse.
+    // Rare, restrained red LED pulse — independent of the screen's
+    // life/death state, not cyan.
     if (ledRef.current) {
       const pulse = reduceMotion ? 0 : Math.max(0, Math.sin(t * 0.35));
       ledRef.current.material.emissiveIntensity = 0.25 + pulse * 0.9;
@@ -104,7 +139,7 @@ export default function CRTTerminal({
   });
 
   return (
-    <group position={position} scale={0.72}>
+    <group position={position} rotation={rotation} scale={0.72}>
       {/* Monitor casing — slightly uneven roughness reads as worn plastic
           rather than a clean render, without adding geometry or deps. */}
       <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
@@ -117,7 +152,7 @@ export default function CRTTerminal({
       </mesh>
 
       {/* Faint grime/wear streak beneath the screen bezel */}
-      <mesh position={[0, 0.78, 0.665]} rotation={[0, 0, 0]}>
+      <mesh position={[0, 0.78, 0.665]}>
         <planeGeometry args={[1.1, 0.1]} />
         <meshStandardMaterial
           color="#0a0c0c"
@@ -128,9 +163,11 @@ export default function CRTTerminal({
         />
       </mesh>
 
-      {/* Recessed screen bezel */}
-      <mesh position={[0, 1.2, 0.66]} castShadow>
-        <boxGeometry args={[1.15, 0.95, 0.06]} />
+      {/* Recessed screen bezel. Deepened from 0.06 to 0.14 so the glass
+          sits genuinely inside a hood: at a grazing view angle the near
+          bezel wall crops the glass rather than presenting it flat. */}
+      <mesh position={[0, 1.2, 0.62]} castShadow>
+        <boxGeometry args={[1.15, 0.95, 0.14]} />
         <meshStandardMaterial
           color="#101415"
           roughness={0.66}
@@ -138,53 +175,42 @@ export default function CRTTerminal({
         />
       </mesh>
 
-      {/* CRT glass — intentionally near-black, only faintly emissive */}
-      <mesh position={[0, 1.2, 0.7]}>
+      {/* CRT glass — recessed behind the bezel lip and effectively unlit.
+          Kept as a surface so the machine reads as a machine, not as a
+          light source with a rectangle on it. */}
+      <mesh position={[0, 1.2, 0.655]}>
         <planeGeometry args={[1.0, 0.8]} />
         <meshStandardMaterial
           ref={screenMatRef}
           color="#010505"
           emissive={SCREEN_EMISSIVE}
-          emissiveIntensity={0.1}
+          emissiveIntensity={0.02}
           roughness={0.52}
           metalness={0}
         />
-
-        {/* Screen-attached DOM text: stays locked to the CRT under resizing. */}
-        <Html
-          transform
-          occlude
-          position={[0, 0, 0.012]}
-          distanceFactor={1.55}
-          style={{ pointerEvents: "none" }}
-        >
-          <div
-            className="crt-terminal-readout"
-            style={{ opacity: readoutOpacity }}
-            aria-hidden="true"
-          >
-            {terminalLines.map((line, i) =>
-              line === "_" ? (
-                <div key={i} className="crt-terminal-readout-line">
-                  <span className="crt-terminal-cursor">_</span>
-                </div>
-              ) : (
-                <div key={i} className="crt-terminal-readout-line">
-                  {line}
-                </div>
-              ),
-            )}
-          </div>
-        </Html>
       </mesh>
 
-      {/* Small local screen glow — no more cyan floodlight. */}
+      {/* Very short reach — kisses the bezel lip only. `distance` is in
+          world units and is NOT scaled by this group's 0.72 scale, so
+          these stay deliberately small numbers. */}
       <pointLight
-        ref={screenLightRef}
-        position={[0, 1.18, 1.0]}
+        ref={bezelLightRef}
+        position={[0, 1.2, 0.95]}
         color={ACTIVE_CYAN}
-        intensity={0.3}
-        distance={2.1}
+        intensity={0.1}
+        distance={0.75}
+        decay={2}
+      />
+
+      {/* The screen's spill, aimed at the ground rather than at the
+          camera. This is the only cyan the SIGNAL composition actually
+          shows at any size: a soft pool on a rough floor. */}
+      <pointLight
+        ref={spillLightRef}
+        position={[0.35, 0.16, 1.5]}
+        color={ACTIVE_CYAN}
+        intensity={0.5}
+        distance={2.6}
         decay={2}
       />
 
