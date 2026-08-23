@@ -28,7 +28,8 @@
 // weak fill from over the camera's shoulder keeps the near faces from
 // going fully black. Nothing here is a visible lamp.
 
-import { Canvas } from "@react-three/fiber";
+import { useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import FeedCamera from "./FeedCamera";
 import FeedFragment from "./FeedFragment";
 import FeedGhostTraces from "./FeedGhostTraces";
@@ -39,6 +40,67 @@ import FeedArchitecture, { APERTURE_Z } from "./FeedArchitecture";
 // Must stay identical to `.feed-root`'s background in feed.css.
 export const HAZE = "#0d1112";
 
+// Where the "instead of being rewarded with brightness, the light
+// weakens" response starts, as a fraction of the route's own progress
+// (not raw distance) — the last stretch before Feed.jsx's own
+// progress===1 threshold fires the fade-to-black handoff.
+const THRESHOLD_START = 0.88;
+
+// Owns the three lights that make the aperture read as a destination
+// (key, fill, aperture glow) plus the fog, and eases all four toward a
+// dimmer, more compressed state as progress closes in on the route's
+// end. Kept as one component so the "light weakens" response and the
+// "compression" of the haze move together on the same eased value.
+function ThresholdAtmosphere({ progressRef, reduceMotion }) {
+  const keyRef = useRef(null);
+  const fillRef = useRef(null);
+  const apertureRef = useRef(null);
+  const fogRef = useRef(null);
+  const smoothed = useRef(0);
+
+  useFrame((_, delta) => {
+    const raw = Math.min(
+      1,
+      Math.max(0, (progressRef.current - THRESHOLD_START) / (1 - THRESHOLD_START)),
+    );
+    const amount = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
+    smoothed.current += (raw - smoothed.current) * amount;
+    const t = smoothed.current;
+
+    if (keyRef.current) keyRef.current.intensity = 9 * (1 - t * 0.85);
+    if (fillRef.current) fillRef.current.intensity = 10 * (1 - t * 0.5);
+    if (apertureRef.current) apertureRef.current.intensity = 1900 * (1 - t * 0.92);
+    if (fogRef.current) {
+      fogRef.current.near = 16 - t * 10;
+      fogRef.current.far = 170 - t * 100;
+    }
+  });
+
+  return (
+    <>
+      <fog ref={fogRef} attach="fog" args={[HAZE, 16, 170]} />
+
+      <directionalLight
+        ref={keyRef}
+        position={[0, 26, APERTURE_Z + 10]}
+        intensity={9}
+        color="#8b9a92"
+      />
+
+      <directionalLight ref={fillRef} position={[7, 14, 34]} intensity={10} color="#42565c" />
+
+      <pointLight
+        ref={apertureRef}
+        position={[0, 10, APERTURE_Z + 6]}
+        intensity={1900}
+        color="#8fa096"
+        distance={150}
+        decay={2}
+      />
+    </>
+  );
+}
+
 export default function FeedScene({ fragments, progressRef, reduceMotion }) {
   return (
     <Canvas
@@ -46,10 +108,6 @@ export default function FeedScene({ fragments, progressRef, reduceMotion }) {
       camera={{ position: [0, 1.75, 12], fov: 52, near: 0.1, far: 320 }}
       gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
     >
-      {/* far reaches past the aperture at z -186 so the end of the nave
-          grades into haze instead of clipping. */}
-      <fog attach="fog" args={[HAZE, 16, 170]} />
-
       {/* These intensities look large next to the Prelude's, and they are
           not comparable. A surface here resolves to roughly
           `irradiance * albedo / PI`, then ACES tone mapping, then the sRGB
@@ -66,31 +124,12 @@ export default function FeedScene({ fragments, progressRef, reduceMotion }) {
           dark without crushing them to black. */}
       <hemisphereLight args={["#36474b", "#1a2120", 12]} />
 
-      {/* Key: from high behind the aperture, raking back up the nave. It
-          reads on the floor and on any surface angled away from the
-          camera — silhouette and rim, not flat illumination. */}
-      <directionalLight
-        position={[0, 26, APERTURE_Z + 10]}
-        intensity={9}
-        color="#8b9a92"
-      />
-
-      {/* Fill over the camera's shoulder so the near faces of the
-          colonnade are charcoal rather than black. Deliberately much
-          weaker than the key. */}
-      <directionalLight position={[7, 14, 34]} intensity={10} color="#42565c" />
-
-      {/* The aperture as an actual light source rather than a painted
-          bright rectangle: it falls off with distance, so the far end of
-          the nave is genuinely brighter than the near end and the depth
-          gradient is lit rather than faked. */}
-      <pointLight
-        position={[0, 10, APERTURE_Z + 6]}
-        intensity={1900}
-        color="#8fa096"
-        distance={150}
-        decay={2}
-      />
+      {/* Key (raking back up the nave from behind the aperture), fill
+          (over the camera's shoulder) and the aperture's own point light,
+          plus the fog they sit inside — all four eased toward a dimmer,
+          more compressed state as progress nears the route's end. See
+          ThresholdAtmosphere above. */}
+      <ThresholdAtmosphere progressRef={progressRef} reduceMotion={reduceMotion} />
 
       <FeedCamera progressRef={progressRef} reduceMotion={reduceMotion} />
 

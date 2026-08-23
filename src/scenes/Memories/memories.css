@@ -1,0 +1,110 @@
+/* src/scenes/Memories/memories.css
+   Layout + atmosphere for Memories.
+
+   Design tokens (--amber, --ink-dim, --font-system, etc.) are already
+   global via prelude.css's :root block, loaded unconditionally since
+   App.jsx always imports Prelude. Reused here rather than redefined.
+
+   This is the first scene in the experience where amber appears as an
+   environment colour rather than only as a UI accent — which is the
+   point of the scene — but it stays extremely restrained. Cyan does not
+   appear anywhere in this file, per the project's fixed colour roles.
+*/
+
+.memories-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Must stay identical to WARM_DARK in MemoriesScene.jsx and to
+     `.graveyard-leave-overlay`'s background. The Graveyard fades to this
+     exact value before handing over, so the scene swap happens behind a
+     colour that never changes and is therefore invisible. */
+  background: #0b0806;
+  touch-action: none;
+  font-family: var(--font-system);
+  color: var(--ink-dim);
+  user-select: none;
+}
+
+.memories-canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.memories-canvas-layer canvas {
+  display: block;
+}
+
+/* Tighter and warmer than the Graveyard's. The Graveyard's vignette
+   pushed a vast open space toward its edges; this one closes an already
+   small space in a little further, and it is tinted rather than neutral
+   black so the darkness around the lamp stays part of the same warm
+   world. */
+.memories-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 42% 54%,
+    transparent 30%,
+    rgba(8, 5, 4, 0.72) 100%
+  );
+}
+
+/* Starts opaque at the warm dark the Graveyard handed over at, and fades
+   out exactly once (see Memories.jsx's runEntrance). Because the incoming
+   value matches the outgoing one, the React mount swap happens with
+   nothing visibly changing. */
+.memories-entrance-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: #0b0806;
+  opacity: 1;
+}
+
+/* Same restrained orientation mark as Feed and the Graveyard, warmed a
+   step to match the scene. */
+/* The Memories -> Last Message handoff. Fades to pure black rather than
+   to a shared warm value the way `.graveyard-leave-overlay` did for the
+   handoff into this scene — deliberately: warmth is the thing being
+   extinguished here, so this exit should not carry it forward. Last
+   Message mounts already black and reveals itself from there, same
+   shape as this scene mounting already warm-dark from the Graveyard. */
+.memories-leave-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: #000;
+  opacity: 0;
+}
+
+.memories-hud {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  z-index: 5;
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--amber-dim);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.memories-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

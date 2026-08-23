@@ -1,0 +1,231 @@
+/* src/scenes/LastMessage/lastmessage.css
+   Layout + the finale's text beats.
+
+   Design tokens are already global via prelude.css's :root block, loaded
+   unconditionally since App.jsx always imports Prelude. Every fade below
+   is a CSS `[data-phase="..."]` opacity rule keyed off the root's own
+   attribute, the same technique Prelude already uses for its own HUD
+   (`.prelude-root[data-phase="archive"] .prelude-hud { opacity: ...;
+   transition: opacity ...; }`) — not a second animation system next to
+   GSAP. GSAP (see LastMessage.jsx) only ever decides WHEN the attribute
+   changes; the visible fade in and back out is entirely these rules.
+
+   No amber anywhere in this file. Amber is the project's UI-accent
+   colour; nothing here is a control except the reconnect button, and
+   even that stays in the same muted ink family as everything else —
+   this scene has no interface left to accent. Cyan does not appear here
+   either; it belongs to CRTTerminal's own physical screen glow in
+   LastMessageScene.jsx and nowhere else.
+*/
+
+.lastmessage-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Must stay identical to HAZE in LastMessageScene.jsx and to
+     `.memories-leave-overlay`'s background. Memories fades to this exact
+     value before handing over, so the swap has no seam. */
+  background: #08090a;
+  font-family: var(--font-system);
+  color: var(--ink-dim);
+  user-select: none;
+}
+
+.lastmessage-canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.lastmessage-canvas-layer canvas {
+  display: block;
+}
+
+/* Reveals the scene on mount (the "almost nothing" first beat) and, far
+   more importantly, performs the finale's own "immediate blackout" —
+   this one element does both jobs, since the incoming and outgoing
+   colours are identical. Once opaque it stays opaque forever; nothing
+   after blackout depends on the 3D layer again. */
+.lastmessage-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: #08090a;
+  opacity: 1;
+}
+
+/* --- Terminal status + goodbye ---
+   Grouped in the lower third, close together, so "See you tomorrow."
+   reads as one more line the same machine printed rather than as a
+   separate announcement. */
+
+.lastmessage-status {
+  position: absolute;
+  left: 8%;
+  bottom: 16%;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+[data-phase="status"] .lastmessage-status,
+[data-phase="message"] .lastmessage-status,
+[data-phase="silence"] .lastmessage-status,
+[data-phase="failing"] .lastmessage-status {
+  opacity: 1;
+}
+
+.lastmessage-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+.lastmessage-status-label {
+  color: var(--ink-faint);
+}
+
+.lastmessage-status-dots {
+  flex: 1 1 auto;
+  min-width: 20px;
+  border-bottom: 1px dotted rgba(168, 155, 140, 0.25);
+  height: 0;
+  align-self: center;
+}
+
+.lastmessage-status-value {
+  color: var(--ink-dim);
+}
+
+.lastmessage-goodbye {
+  margin-top: 22px;
+  max-width: 320px;
+  font-family: var(--font-archive);
+  font-size: 20px;
+  color: var(--ink-dim);
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+[data-phase="message"] .lastmessage-goodbye,
+[data-phase="silence"] .lastmessage-goodbye,
+[data-phase="failing"] .lastmessage-goodbye {
+  opacity: 1;
+}
+
+/* --- Connection lost ---
+   Dead centre, against pure black — nothing else is on screen by the
+   time this appears (see .lastmessage-veil above). Fades back out on its
+   own the moment phase advances past "connectionLost", since no later
+   phase is listed in its visible rule below. */
+.lastmessage-connection-lost {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--font-system);
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  color: var(--ink-dim);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+[data-phase="connectionLost"] .lastmessage-connection-lost {
+  opacity: 1;
+}
+
+/* --- Thesis ---
+   The one line withheld until after the narrative ending, per the
+   project's own non-negotiable rule. Appears exactly once, here, and
+   fades the same way CONNECTION LOST did — not present in "ended"'s
+   selector list below, so it is already gone by the time the reconnect
+   affordance can appear. */
+.lastmessage-thesis {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 6;
+  pointer-events: none;
+  font-family: var(--font-archive);
+  font-size: 22px;
+  text-align: center;
+  color: var(--ink-dim);
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+
+[data-phase="thesis"] .lastmessage-thesis {
+  opacity: 1;
+}
+
+/* --- Reconnect ---
+   Always in the DOM (see the comment in LastMessage.jsx on why) but
+   `disabled` until "ended", which removes it from the tab order and the
+   accessibility tree until then. The long transition-delay is the
+   "delay significantly" the brief asks for; it starts counting the
+   moment "ended" begins, well after the thesis's own 1.8s fade-out has
+   finished, so the two never overlap on screen. */
+.lastmessage-reconnect {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  z-index: 7;
+  background: none;
+  border: 1px solid rgba(168, 155, 140, 0.28);
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  padding: 8px 16px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 1.6s ease, border-color 0.2s ease, color 0.2s ease;
+  transition-delay: 4s, 0s, 0s;
+}
+
+.lastmessage-reconnect:disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+[data-phase="ended"] .lastmessage-reconnect {
+  opacity: 1;
+}
+
+.lastmessage-reconnect:not(:disabled):hover,
+.lastmessage-reconnect:not(:disabled):focus-visible {
+  color: var(--ink-dim);
+  border-color: rgba(168, 155, 140, 0.55);
+}
+
+.lastmessage-reconnect:focus-visible {
+  outline: 1px solid var(--ink-dim);
+  outline-offset: 3px;
+}
+
+.lastmessage-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

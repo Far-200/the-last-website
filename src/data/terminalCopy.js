@@ -107,6 +107,26 @@ export const ctaCopy = {
   thesis: "The internet didn't preserve history.\nIt preserved people.",
 };
 
+// --- FINALE — LAST MESSAGE ----------------------------------------------
+// Canonical copy for the ending sequence, locked by
+// docs/PROJECT_PLAN.md section 4.1 ("the single authoritative order for
+// the ending"). goodbye/connectionLost live here rather than being typed
+// inline in the scene component so this stays the one place the finale's
+// exact wording can be tuned — same reason every other depth's copy
+// lives in this file. The thesis line itself is `ctaCopy.thesis` above,
+// already staged there and unused until now: this is that "once, after
+// the ending" appearance.
+export const lastMessageCopy = {
+  statusLines: [
+    { label: "FILES RECOVERED", value: "4" },
+    { label: "USERS ONLINE", value: "0" },
+    { label: "NETWORK", value: "OFFLINE" },
+  ],
+  goodbye: "See you tomorrow.",
+  connectionLost: "CONNECTION LOST",
+  reconnect: "[ RECONNECT ]",
+};
+
 export const heroCopy = {
   title: "THE LAST WEBSITE",
 };

@@ -1,0 +1,140 @@
+/* src/scenes/Graveyard/graveyard.css
+   Layout + atmosphere for the Graveyard.
+
+   Design tokens (--amber, --ink-dim, --font-system, --font-archive, etc.)
+   are already global via prelude.css's :root block, loaded unconditionally
+   since App.jsx always imports Prelude. Reused here rather than redefined.
+   The CAPTCHA panel intentionally does not use --amber in this pass — it
+   stays cold and drained, reserving the accent for whenever interaction
+   is added in a later pass. Cyan does not appear anywhere in this file,
+   per the project's fixed color roles.
+*/
+
+.graveyard-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Matches ZENITH in GraveyardArchitecture.jsx. The gradient backdrop
+     covers the canvas completely, so this is only ever seen in the frame
+     before first paint — but keeping it at the scene's darkest value
+     means that frame is never a flash of the wrong colour. */
+  background: #080a0b;
+  touch-action: none;
+  font-family: var(--font-system);
+  color: var(--ink-dim);
+  user-select: none;
+}
+
+.graveyard-canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.graveyard-canvas-layer canvas {
+  display: block;
+}
+
+.graveyard-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+/* Covers the whole scene at opacity 1 on mount and fades out exactly
+   once (see Graveyard.jsx's runEntrance). Feed hands off already fully
+   black — see Feed.jsx's own threshold fade — so this is what actually
+   reveals the Graveyard rather than a page-load flash, and it is what
+   makes the world "opening" a felt event rather than a page swap. A
+   one-shot GSAP moment, not a continuous effect. */
+.graveyard-entrance-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: #000;
+  opacity: 1;
+}
+
+/* The exit fade, run once by the verification timeline in Graveyard.jsx.
+   Deliberately NOT pure black like Feed's threshold overlay: this is the
+   cold-to-intimate handoff, and Memories mounts from this same warm
+   near-black, so the two scenes share one continuous surface across the
+   React swap and the mount change is never visible. Must stay identical
+   to `.memories-root`'s background and to memories.css's entrance
+   overlay. */
+.graveyard-leave-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: #0b0806;
+  opacity: 0;
+}
+
+/* Keyboard route to the CAPTCHA checkbox, which is a mesh in the canvas
+   and cannot receive focus. Visually hidden, but focusable — so it must
+   still show a focus ring when tabbed to, which the clip-based hiding
+   below would otherwise swallow. */
+.graveyard-verify-button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.graveyard-verify-button:focus-visible {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: auto;
+  height: auto;
+  clip: auto;
+  margin: 0;
+  padding: 8px 14px;
+  overflow: visible;
+  background: #0b0f10;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  z-index: 20;
+}
+
+/* Deliberately restrained — matches Feed's own orientation mark, not a
+   HUD. */
+.graveyard-hud {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  z-index: 5;
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.graveyard-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The CAPTCHA's interface used to live here as a DOM card rendered
+   through drei's <Html>. It is now a canvas texture on a panel inset
+   into the monument itself (see GraveyardCaptcha.jsx) — lit, fogged and
+   scaled by the architecture rather than by a CSS pixel width, which is
+   the only way it could read as part of the building instead of as a
+   web card floating in front of it. No CSS remains for it by design. */

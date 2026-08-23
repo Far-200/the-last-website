@@ -11,8 +11,23 @@
 // times per second, and FeedCamera only ever needs the latest value
 // inside its own useFrame loop, not a re-render. This keeps the
 // continuous-input path free of React render churn.
+//
+// Feed -> Graveyard handoff
+// -------------------------
+// The route's camera path ends 66 units short of the aperture itself
+// (see FeedArchitecture's APERTURE_Z vs ROUTE_END_Z) — the same
+// proportion the aperture's own fog-exempt backdrop plane already uses
+// to stay a distant destination rather than a wall the camera hits. So
+// "crossing" it is authored as reaching the end of the scroll route,
+// not clipping through geometry: progress hitting 1 freezes further
+// input and fires a single GSAP fade to black (FeedScene dims the key/
+// fill/aperture lights and compresses fog toward that same point, so
+// the light visibly weakens rather than paying off). Only once the
+// screen is fully black does `onThresholdCrossed` fire, so App's scene
+// swap to Graveyard is never visible as a swap.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import FeedScene from "./FeedScene";
 import { feedFragments } from "../../data/feedFragments";
 import "./feed.css";
@@ -44,10 +59,25 @@ const LINE_HEIGHT_PX = 16;
 // faster through it.
 const PROGRESS_PER_PIXEL = 0.00012;
 
-export default function Feed() {
+export default function Feed({ onThresholdCrossed }) {
   const reduceMotion = usePrefersReducedMotion();
   const rootRef = useRef(null);
   const progressRef = useRef(0);
+  const overlayRef = useRef(null);
+  const crossingRef = useRef(false);
+  const timelineRef = useRef(null);
+
+  useEffect(() => () => timelineRef.current?.kill(), []);
+
+  const beginCrossing = useCallback(() => {
+    const tl = gsap.timeline({ onComplete: () => onThresholdCrossed?.() });
+    timelineRef.current = tl;
+    tl.to(overlayRef.current, {
+      opacity: 1,
+      duration: reduceMotion ? 0.4 : 1.3,
+      ease: "power2.in",
+    });
+  }, [reduceMotion, onThresholdCrossed]);
 
   useEffect(() => {
     const node = rootRef.current;
@@ -59,14 +89,21 @@ export default function Feed() {
     // scroll-chaining/rubber-banding, not the only thing preventing it).
     const handleWheel = (event) => {
       event.preventDefault();
+      if (crossingRef.current) return;
+
       const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
-      const next = progressRef.current + pixelDelta * PROGRESS_PER_PIXEL;
-      progressRef.current = Math.min(1, Math.max(0, next));
+      const next = Math.min(1, Math.max(0, progressRef.current + pixelDelta * PROGRESS_PER_PIXEL));
+      progressRef.current = next;
+
+      if (next >= 1) {
+        crossingRef.current = true;
+        beginCrossing();
+      }
     };
 
     node.addEventListener("wheel", handleWheel, { passive: false });
     return () => node.removeEventListener("wheel", handleWheel);
-  }, []);
+  }, [beginCrossing]);
 
   return (
     <div className="feed-root" ref={rootRef}>
@@ -75,6 +112,8 @@ export default function Feed() {
       </div>
 
       <div className="feed-vignette" aria-hidden="true" />
+
+      <div ref={overlayRef} className="feed-threshold-overlay" aria-hidden="true" />
 
       <div className="feed-hud" aria-hidden="true">
         ARCHIVE // FEED
