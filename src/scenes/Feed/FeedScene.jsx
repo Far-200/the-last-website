@@ -35,6 +35,8 @@ import FeedFragment from "./FeedFragment";
 import FeedGhostTraces from "./FeedGhostTraces";
 import FeedDebris from "./FeedDebris";
 import FeedParticles from "./FeedParticles";
+import FeedSecondaryFragments from "./FeedSecondaryFragments";
+import FeedArchiveField from "./FeedArchiveField";
 import FeedArchitecture, { APERTURE_Z } from "./FeedArchitecture";
 
 // Must stay identical to `.feed-root`'s background in feed.css.
@@ -135,6 +137,13 @@ export default function FeedScene({ fragments, progressRef, reduceMotion }) {
 
       <FeedArchitecture />
       <FeedDebris />
+
+      {/* Physical archive population, kept separate from both authored
+          primary fragments and text-only ghost traces. The secondary layer
+          carries a few recognizable content types; the instanced field
+          implies the much larger volume behind them. */}
+      <FeedArchiveField />
+      <FeedSecondaryFragments />
 
       {fragments.map((fragment) => (
         <FeedFragment key={fragment.id} fragment={fragment} reduceMotion={reduceMotion} />

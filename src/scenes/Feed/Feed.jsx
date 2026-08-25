@@ -120,7 +120,7 @@ export default function Feed({ onThresholdCrossed }) {
       </div>
 
       <p className="feed-visually-hidden" role="status">
-        An archive of recovered fragments, suspended in the dark. Scroll to move forward through them.
+        A vast, ruined social archive crowded with recovered posts, dead screens, and fading traces. Scroll to move forward through it.
       </p>
     </div>
   );
