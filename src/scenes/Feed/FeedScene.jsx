@@ -30,14 +30,15 @@
 
 import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import FeedCamera from "./FeedCamera";
+import * as THREE from "three";
+import FeedCamera, { ARRIVAL_DISTANCE } from "./FeedCamera";
 import FeedFragment from "./FeedFragment";
 import FeedGhostTraces from "./FeedGhostTraces";
 import FeedDebris from "./FeedDebris";
 import FeedParticles from "./FeedParticles";
 import FeedSecondaryFragments from "./FeedSecondaryFragments";
 import FeedArchiveField from "./FeedArchiveField";
-import FeedArchitecture, { APERTURE_Z } from "./FeedArchitecture";
+import FeedArchitecture, { APERTURE_Z, ROUTE_START_Z } from "./FeedArchitecture";
 
 // Must stay identical to `.feed-root`'s background in feed.css.
 export const HAZE = "#0d1112";
@@ -48,12 +49,28 @@ export const HAZE = "#0d1112";
 // progress===1 threshold fires the fade-to-black handoff.
 const THRESHOLD_START = 0.88;
 
-// Owns the three lights that make the aperture read as a destination
-// (key, fill, aperture glow) plus the fog, and eases all four toward a
-// dimmer, more compressed state as progress closes in on the route's
-// end. Kept as one component so the "light weakens" response and the
-// "compression" of the haze move together on the same eased value.
-function ThresholdAtmosphere({ progressRef, reduceMotion }) {
+// Arrival-side counterpart to THRESHOLD_START's exit dimming: the fog
+// starts pulled in tight to the camera and every light starts a shade
+// above zero (not literally zero — a hard-zero first frame reads as a
+// missing light, not as atmosphere) so the frame is heavily occluded on
+// mount, matching the darkness LeavingDolly leaves the Prelude side on.
+// Both ease back to the scene's normal baseline (which is exactly what
+// this component already computes at progress=0/threshold-t=0) as
+// arrivalProgressRef advances from Feed.jsx's own GSAP tween.
+const ARRIVAL_FOG = [1, 5];
+const ARRIVAL_DIM_FLOOR = 0.06;
+
+// Owns every light in the scene (hemisphere, key, fill, aperture glow)
+// plus the fog, so the two ends of Feed's atmosphere — arriving into it
+// and approaching the threshold out the far end — share one place that
+// writes these values instead of two systems that could disagree about
+// what "normal" looks like in between. Arrival and the threshold-exit
+// response never overlap in time (progress is held at 0 throughout
+// arrival), so there is never a conflict about which one is "in charge"
+// on a given frame — the two blends simply multiply together, and
+// whichever one is inactive contributes exactly 1.
+function Atmosphere({ progressRef, reduceMotion, arrival, arrivalProgressRef }) {
+  const hemiRef = useRef(null);
   const keyRef = useRef(null);
   const fillRef = useRef(null);
   const apertureRef = useRef(null);
@@ -67,19 +84,47 @@ function ThresholdAtmosphere({ progressRef, reduceMotion }) {
     );
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
     smoothed.current += (raw - smoothed.current) * amount;
-    const t = smoothed.current;
+    const exitT = smoothed.current;
 
-    if (keyRef.current) keyRef.current.intensity = 9 * (1 - t * 0.85);
-    if (fillRef.current) fillRef.current.intensity = 10 * (1 - t * 0.5);
-    if (apertureRef.current) apertureRef.current.intensity = 1900 * (1 - t * 0.92);
+    const baseNear = 16 - exitT * 10;
+    const baseFar = 170 - exitT * 100;
+    const exitDim = { key: 1 - exitT * 0.85, fill: 1 - exitT * 0.5, aperture: 1 - exitT * 0.92 };
+
+    const at = arrival ? THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1) : 1;
+    // Steeply backloaded relative to the camera's own (already-eased)
+    // arrival curve. This has to be much more aggressive than it looks:
+    // fog/light aren't lerping toward small numbers, they're lerping
+    // toward this scene's genuinely huge resting values (fog far=170,
+    // the aperture's point light at 1900 intensity) — through ACES tone
+    // mapping, even 25% of that reveal was enough to read as fully lit,
+    // because the far end of a linear intensity ramp compresses hard
+    // under tone mapping while the near end (where this needs to spend
+    // most of its time) doesn't. An exponent of 1.6 left the scene
+    // visually resolved by ~35% of the way through arrival; at 3.2, ~80%
+    // of the visible clearing happens in the last fifth of the duration,
+    // camera settling largely already done. Camera position uses `at`
+    // directly — see FeedCamera — so it keeps its own gentler
+    // deceleration independent of this.
+    const revealT = arrival ? Math.pow(at, 5) : 1;
+    const arrivalDim = arrival ? ARRIVAL_DIM_FLOOR + (1 - ARRIVAL_DIM_FLOOR) * revealT : 1;
+
+    if (hemiRef.current) hemiRef.current.intensity = 12 * arrivalDim;
+    if (keyRef.current) keyRef.current.intensity = 9 * exitDim.key * arrivalDim;
+    if (fillRef.current) fillRef.current.intensity = 10 * exitDim.fill * arrivalDim;
+    if (apertureRef.current) apertureRef.current.intensity = 1900 * exitDim.aperture * arrivalDim;
     if (fogRef.current) {
-      fogRef.current.near = 16 - t * 10;
-      fogRef.current.far = 170 - t * 100;
+      fogRef.current.near = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[0], baseNear, revealT) : baseNear;
+      fogRef.current.far = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[1], baseFar, revealT) : baseFar;
     }
   });
 
   return (
     <>
+      {/* Indirect, sourceless base. The sky term is what lifts the floor
+          plane into visibility; the ground term keeps the vault
+          undersides dark without crushing them to black. */}
+      <hemisphereLight ref={hemiRef} args={["#36474b", "#1a2120", 12]} />
+
       <fog ref={fogRef} attach="fog" args={[HAZE, 16, 170]} />
 
       <directionalLight
@@ -103,13 +148,49 @@ function ThresholdAtmosphere({ progressRef, reduceMotion }) {
   );
 }
 
-export default function FeedScene({ fragments, progressRef, reduceMotion }) {
+// Fires once, on the Canvas's first actual rendered frame — not on mount
+// (before the WebGL context and this scene's geometry/materials exist)
+// and not on Canvas's `onCreated` (which fires once the renderer exists
+// but before anything has necessarily been drawn). Feed.jsx uses this to
+// delay starting the arrival clock until there is something on screen to
+// animate: starting it at mount time measured real elapsed time against
+// wall-clock duration while Feed's initial scene graph — columns, vaults,
+// the instanced archive field, eight fragment cards — was still being
+// constructed and uploaded to the GPU, which on a busy frame can itself
+// take a few hundred milliseconds. That's real time GSAP doesn't get
+// back, and against an arrival only ~1.1s long it was consuming enough
+// of the budget that the reveal read as already mostly finished by the
+// time the first frame actually painted.
+function ReadySignal({ onReady }) {
+  const firedRef = useRef(false);
+  useFrame(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onReady?.();
+  });
+  return null;
+}
+
+export default function FeedScene({
+  fragments,
+  progressRef,
+  reduceMotion,
+  arrival = false,
+  arrivalProgressRef,
+  onReady,
+}) {
   return (
     <Canvas
       dpr={[1, 1.75]}
-      camera={{ position: [0, 1.75, 12], fov: 52, near: 0.1, far: 320 }}
+      camera={{
+        position: [0, 1.75, arrival ? ROUTE_START_Z + ARRIVAL_DISTANCE : ROUTE_START_Z],
+        fov: 52,
+        near: 0.1,
+        far: 320,
+      }}
       gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
     >
+      {onReady && <ReadySignal onReady={onReady} />}
       {/* These intensities look large next to the Prelude's, and they are
           not comparable. A surface here resolves to roughly
           `irradiance * albedo / PI`, then ACES tone mapping, then the sRGB
@@ -120,20 +201,19 @@ export default function FeedScene({ fragments, progressRef, reduceMotion }) {
           by enough to survive that chain. Measured, not guessed — the
           near stone now lands around RGB 32-40, which is dark but
           legible. */}
+      <Atmosphere
+        progressRef={progressRef}
+        reduceMotion={reduceMotion}
+        arrival={arrival}
+        arrivalProgressRef={arrivalProgressRef}
+      />
 
-      {/* Indirect, sourceless base. The sky term is what lifts the floor
-          plane into visibility; the ground term keeps the vault undersides
-          dark without crushing them to black. */}
-      <hemisphereLight args={["#36474b", "#1a2120", 12]} />
-
-      {/* Key (raking back up the nave from behind the aperture), fill
-          (over the camera's shoulder) and the aperture's own point light,
-          plus the fog they sit inside — all four eased toward a dimmer,
-          more compressed state as progress nears the route's end. See
-          ThresholdAtmosphere above. */}
-      <ThresholdAtmosphere progressRef={progressRef} reduceMotion={reduceMotion} />
-
-      <FeedCamera progressRef={progressRef} reduceMotion={reduceMotion} />
+      <FeedCamera
+        progressRef={progressRef}
+        reduceMotion={reduceMotion}
+        arrival={arrival}
+        arrivalProgressRef={arrivalProgressRef}
+      />
 
       <FeedArchitecture />
       <FeedDebris />

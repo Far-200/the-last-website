@@ -61,7 +61,12 @@
 }
 
 /* Deliberately restrained — the 3D archive is the interface, this is a
-   small orientation mark, not a HUD. */
+   small orientation mark, not a HUD. Held at 0 and faded in after a
+   delay rather than present from the first frame: DOM chrome popping in
+   at the exact instant Feed mounts is its own small "new page" signal,
+   compounding the WebGL scene swap it sits next to. The delay lets
+   spatial arrival (see Feed.jsx's arrivalPhase) establish itself first —
+   the label follows the place, not the other way round. */
 .feed-hud {
   position: absolute;
   top: 28px;
@@ -71,8 +76,22 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--ink-faint);
-  opacity: 0.45;
+  opacity: 0;
   pointer-events: none;
+  animation: feed-hud-in 0.9s ease 0.5s forwards;
+}
+
+@keyframes feed-hud-in {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-hud {
+    animation: none;
+    opacity: 0.45;
+  }
 }
 
 .feed-visually-hidden {

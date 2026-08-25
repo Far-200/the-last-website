@@ -86,9 +86,10 @@ export default function ArchiveFrame({ phase, onEnter }) {
           ref={ctaRef}
           className="depth-cta archive-cta"
           onClick={onEnter}
+          disabled={isLeaving}
           aria-label="Enter the archive"
         >
-          {archiveCopy.cta}
+          {isLeaving ? archiveCopy.ctaEntering : archiveCopy.cta}
         </button>
       </div>
     </div>

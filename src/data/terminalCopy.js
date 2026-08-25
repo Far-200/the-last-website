@@ -96,6 +96,9 @@ export const archiveCopy = {
     "checksum=partial",
   ],
   cta: "[ ENTER ARCHIVE ]",
+  // Shown once activated, mirroring signalCopy's cta/ctaResolving pair —
+  // the button acknowledges the input rather than just disabling silently.
+  ctaEntering: "[ ENTERING... ]",
 };
 
 // The thesis is a narrative reveal, not a tagline — it surfaces exactly

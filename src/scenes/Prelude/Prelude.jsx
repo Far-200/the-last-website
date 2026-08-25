@@ -62,6 +62,12 @@ export default function Prelude({ onConnected }) {
   const [systemRevealStep, setSystemRevealStep] = useState(0);
   const reduceMotion = usePrefersReducedMotion();
   const timelineRef = useRef(null);
+  // Drives the leaving-phase forward dolly, fog tightening and light
+  // dimming in PreludeScene — see LeavingDolly there. A ref, not state,
+  // for the same reason progressRef is a ref throughout the project:
+  // GSAP writes to it every tick and a per-frame consumer reads it
+  // directly, so this never needs to trigger a React render.
+  const leavingProgressRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -122,19 +128,41 @@ export default function Prelude({ onConnected }) {
     runSequence();
   }, [phase, runSequence]);
 
+  // The Prelude -> Feed match cut. Under full motion this is a real
+  // forward dolly (see LeavingDolly in PreludeScene.jsx): the camera
+  // pushes forward, levels its pitch and widens toward Feed's own FOV
+  // while the scene's existing fog and lights darken toward the cut, so
+  // the world itself occludes the frame rather than a DOM overlay doing
+  // it. `onConnected` fires at leavingProgressRef reaching 1 — the
+  // darkest, most-forward frame — which is also the least perceptible
+  // moment for App.jsx's scene swap to land on.
+  //
+  // Reduced motion skips the dolly entirely (no translation, no FOV
+  // change — see LeavingDolly's own reduceMotion branch) rather than
+  // just playing it faster: a moving camera is exactly the vestibular
+  // trigger prefers-reduced-motion exists to avoid. What's left is a
+  // brief hold, short enough that it reads as a beat, not a stall.
   const handleEnterArchive = useCallback(() => {
     if (phase !== "archive") return;
     setPhase("leaving");
 
     const tl = gsap.timeline({ onComplete: () => onConnected?.() });
     timelineRef.current = tl;
-    tl.to({}, { duration: reduceMotion ? 0.05 : 0.65 });
+    tl.to(leavingProgressRef, {
+      current: 1,
+      duration: reduceMotion ? 0.4 : 1.5,
+      ease: reduceMotion ? "power1.out" : "power1.inOut",
+    });
   }, [phase, onConnected, reduceMotion]);
 
   return (
     <div className="prelude-root" data-phase={phase}>
       <div className="prelude-canvas-layer">
-        <PreludeScene reduceMotion={reduceMotion} phase={phase} />
+        <PreludeScene
+          reduceMotion={reduceMotion}
+          phase={phase}
+          leavingProgressRef={leavingProgressRef}
+        />
       </div>
 
       <div className="prelude-floor-glow" aria-hidden="true" />

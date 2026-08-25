@@ -3,11 +3,29 @@
 // The Feed's continuous camera authority. Position and orientation are
 // derived every frame from a single normalized progress value (owned by
 // Feed.jsx, driven by wheel input) — this is the only system that moves
-// the Feed camera continuously. GSAP never touches it; GSAP is reserved
-// for discrete local moments elsewhere (see FeedFragment's reconstruction
-// sequence). Damping happens once, at the progress level, so both
-// position and look direction come out smooth together instead of
-// needing separate easing.
+// the Feed camera continuously. GSAP never touches the camera directly;
+// GSAP is reserved for discrete local moments elsewhere (see
+// FeedFragment's reconstruction sequence) and, during arrival, for easing
+// the plain arrivalProgressRef this component reads (see below) — the
+// same "GSAP drives a ref, useFrame reads it" split PreludeScene's
+// LeavingDolly uses for the matching half of this same handoff. Damping
+// happens once, at the progress level, so both position and look
+// direction come out smooth together instead of needing separate easing.
+//
+// Arrival
+// -------
+// Feed mounts a few units further back on its own route than its normal
+// t=0 rest position, with progress genuinely held at 0 (Feed.jsx does not
+// touch progressRef until arrival completes) — see Feed.jsx's own header
+// note. While `arrival` is true this component ignores progressRef
+// entirely and eases camera position from ARRIVAL_START toward
+// WAYPOINTS[0] using arrivalProgressRef instead, continuing the forward
+// motion Prelude's own leaving-phase dolly started rather than snapping
+// straight to the route's start. ARRIVAL_END is exactly WAYPOINTS[0], so
+// when arrival flips off and normal progress-driven control resumes
+// (dampedProgress is still 0 at that point), there is no position
+// discontinuity — arrival simply stops writing and progress-driven control
+// picks up from the exact frame it left off on.
 //
 // Look direction
 // --------------
@@ -52,7 +70,22 @@ const LOOK_LATERAL_BLEND = 0.3;
 // looking at the ground rather than standing inside something tall.
 const LOOK_RISE = 1.4;
 
-export default function FeedCamera({ progressRef, reduceMotion = false }) {
+// How far behind the route's own start the arrival dolly begins — see
+// the header note. Kept modest: this is a continuation of Prelude's own
+// dolly, not a second journey, and it shares FeedArchitecture's own
+// world scale (the first columns stand at z=2, only 10 units ahead of
+// ROUTE_START_Z), so a large arrival distance would place the camera
+// somewhere the architecture was never authored to be seen from.
+export const ARRIVAL_DISTANCE = 6;
+const ARRIVAL_START = new THREE.Vector3(0, EYE_HEIGHT, ROUTE_START_Z + ARRIVAL_DISTANCE);
+const ARRIVAL_END = new THREE.Vector3(...WAYPOINTS[0]);
+
+export default function FeedCamera({
+  progressRef,
+  reduceMotion = false,
+  arrival = false,
+  arrivalProgressRef,
+}) {
   const dampedProgress = useRef(0);
   const tmpPosition = useRef(new THREE.Vector3());
   const tmpLookAt = useRef(new THREE.Vector3());
@@ -63,12 +96,27 @@ export default function FeedCamera({ progressRef, reduceMotion = false }) {
   );
 
   useFrame(({ camera }, delta) => {
-    const amount = reduceMotion ? 1 : 1 - Math.pow(0.002, delta);
-    dampedProgress.current += (progressRef.current - dampedProgress.current) * amount;
+    if (arrival) {
+      // Progress-driven damping never starts while arriving — dampedProgress
+      // stays exactly 0, so the instant arrival ends, normal control resumes
+      // from precisely WAYPOINTS[0] with nothing to catch up on.
+      //
+      // arrivalProgressRef itself is a linear 0-1 ramp (see Feed.jsx) —
+      // the ease-out deceleration lives here, as an explicit remap, so it
+      // can be tuned independently of Atmosphere's own (much more
+      // backloaded) remap of the same raw value. Quadratic ease-out: fast
+      // initial coasting, settling gently into WAYPOINTS[0].
+      const raw = THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1);
+      const eased = 1 - (1 - raw) * (1 - raw);
+      tmpPosition.current.lerpVectors(ARRIVAL_START, ARRIVAL_END, eased);
+    } else {
+      const amount = reduceMotion ? 1 : 1 - Math.pow(0.002, delta);
+      dampedProgress.current += (progressRef.current - dampedProgress.current) * amount;
 
-    const t = THREE.MathUtils.clamp(dampedProgress.current, 0, 1);
+      const t = THREE.MathUtils.clamp(dampedProgress.current, 0, 1);
+      path.getPointAt(t, tmpPosition.current);
+    }
 
-    path.getPointAt(t, tmpPosition.current);
     camera.position.copy(tmpPosition.current);
 
     tmpLookAt.current.set(
