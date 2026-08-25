@@ -149,6 +149,8 @@ const backdropVertex = /* glsl */ `
 const backdropFragment = /* glsl */ `
   uniform vec3 horizonColor;
   uniform vec3 zenithColor;
+  uniform vec3 transitionColor;
+  uniform float reveal;
   uniform float radius;
   varying vec3 vLocal;
 
@@ -158,12 +160,13 @@ const backdropFragment = /* glsl */ `
     // short way above it. A wide, slow falloff reads as dawn.
     vec3 c = mix(horizonColor, zenithColor, smoothstep(-0.03, 0.19, h));
     c = mix(c, zenithColor * 0.55, smoothstep(0.0, -0.2, h));
+    c = mix(transitionColor, c, reveal);
     gl_FragColor = vec4(c, 1.0);
     #include <colorspace_fragment>
   }
 `;
 
-function Backdrop() {
+function Backdrop({ arrival, arrivalProgressRef }) {
   const meshRef = useRef(null);
   const radius = 500;
 
@@ -175,6 +178,8 @@ function Backdrop() {
         uniforms: {
           horizonColor: { value: new THREE.Color(HORIZON) },
           zenithColor: { value: new THREE.Color(ZENITH) },
+          transitionColor: { value: new THREE.Color("#0d1112") },
+          reveal: { value: 0 },
           radius: { value: radius },
         },
         side: THREE.BackSide,
@@ -192,6 +197,8 @@ function Backdrop() {
   useFrame(({ camera }) => {
     if (!meshRef.current) return;
     meshRef.current.position.set(camera.position.x, 0, camera.position.z);
+    const raw = arrival ? THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1) : 1;
+    meshRef.current.material.uniforms.reveal.value = arrival ? Math.pow(raw, 3.2) : 1;
   });
 
   return (
@@ -350,10 +357,10 @@ const FALLEN = [
   { position: [-4, -206], length: 24, yaw: 0.52, pitch: -0.3, sink: 1.2, breakAt: 15 },
 ];
 
-export default function GraveyardArchitecture() {
+export default function GraveyardArchitecture({ arrival = false, arrivalProgressRef }) {
   return (
     <group>
-      <Backdrop />
+      <Backdrop arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
       <Ground />
       {TOWERS.map((tower, i) => (
         <RelayTower key={`t${i}`} {...tower} />

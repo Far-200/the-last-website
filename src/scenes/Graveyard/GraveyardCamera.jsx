@@ -33,9 +33,9 @@
 //     so the closing composition is slightly off-axis instead of a
 //     centred altar shot.
 //
-// Everything here remains a continuous function of progress, so camera
-// authority stays entirely with the progression system; no GSAP touches
-// it.
+// Everything here remains a continuous function of refs; GSAP only
+// advances the plain arrival progress in Graveyard.jsx. This useFrame
+// remains the sole camera writer for both arrival and route progression.
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -76,13 +76,21 @@ const RISE_RAMP_START = 0.34;
 // A little over a quarter metre of settle across the route. Enough to
 // feel, not enough to read as a camera move.
 const EYE_DROP = 0.3;
+const ARRIVAL_DISTANCE = 14;
 
-export default function GraveyardCamera({ progressRef, reduceMotion = false }) {
+export default function GraveyardCamera({
+  progressRef,
+  reduceMotion = false,
+  arrival = false,
+  arrivalProgressRef,
+}) {
   const dampedProgress = useRef(0);
   const tmpPosition = useRef(new THREE.Vector3());
   const tmpTangent = useRef(new THREE.Vector3());
   const tmpLookAt = useRef(new THREE.Vector3());
   const tmpAhead = useRef(new THREE.Vector3());
+  const arrivalStart = useRef(new THREE.Vector3());
+  const normalStart = useRef(new THREE.Vector3());
 
   const path = useMemo(
     () => new THREE.CatmullRomCurve3(WAYPOINTS.map((p) => new THREE.Vector3(...p))),
@@ -90,6 +98,32 @@ export default function GraveyardCamera({ progressRef, reduceMotion = false }) {
   );
 
   useFrame(({ camera }, delta) => {
+    path.getPointAt(0, normalStart.current);
+    path.getTangentAt(0, tmpTangent.current);
+
+    if (arrival) {
+      // Start behind the real first waypoint on its actual tangent, not
+      // from an unrelated invented pose. At completion every camera value
+      // below exactly matches normal t=0 control.
+      arrivalStart.current
+        .copy(normalStart.current)
+        .addScaledVector(tmpTangent.current, -ARRIVAL_DISTANCE);
+      const raw = THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1);
+      const eased = 1 - (1 - raw) * (1 - raw);
+      const arrivalT = reduceMotion ? 1 : eased;
+      tmpPosition.current.lerpVectors(arrivalStart.current, normalStart.current, arrivalT);
+      camera.position.copy(tmpPosition.current);
+      tmpAhead.current.copy(camera.position).addScaledVector(tmpTangent.current, TANGENT_DISTANCE);
+      tmpLookAt.current.set(tmpAhead.current.x, camera.position.y + LOOK_RISE_FAR, tmpAhead.current.z);
+      camera.lookAt(tmpLookAt.current);
+
+      if (camera.isPerspectiveCamera) {
+        camera.fov = THREE.MathUtils.lerp(52, 50, arrivalT);
+        camera.updateProjectionMatrix();
+      }
+      return;
+    }
+
     // A slower catch-up than Feed's (0.002): the Graveyard should feel
     // heavier, less responsive to the visitor's own scroll speed.
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.0006, delta);

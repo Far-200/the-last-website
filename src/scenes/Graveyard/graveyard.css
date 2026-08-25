@@ -15,11 +15,10 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  /* Matches ZENITH in GraveyardArchitecture.jsx. The gradient backdrop
-     covers the canvas completely, so this is only ever seen in the frame
-     before first paint — but keeping it at the scene's darkest value
-     means that frame is never a flash of the wrong colour. */
-  background: #080a0b;
+  /* The pre-first-paint safety surface matches Feed's final haze and the
+     arrival backdrop's initial value, so the exclusive React mount cannot
+     flash a different colour before Canvas has rendered. */
+  background: #0d1112;
   touch-action: none;
   font-family: var(--font-system);
   color: var(--ink-dim);
@@ -42,21 +41,6 @@
   z-index: 3;
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.62) 100%);
-}
-
-/* Covers the whole scene at opacity 1 on mount and fades out exactly
-   once (see Graveyard.jsx's runEntrance). Feed hands off already fully
-   black — see Feed.jsx's own threshold fade — so this is what actually
-   reveals the Graveyard rather than a page-load flash, and it is what
-   makes the world "opening" a felt event rather than a page swap. A
-   one-shot GSAP moment, not a continuous effect. */
-.graveyard-entrance-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  background: #000;
-  opacity: 1;
 }
 
 /* The exit fade, run once by the verification timeline in Graveyard.jsx.
@@ -116,8 +100,13 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--ink-faint);
-  opacity: 0.4;
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.45s ease 0.15s;
+}
+
+.graveyard-root[data-arrival="interactive"] .graveyard-hud {
+  opacity: 0.4;
 }
 
 .graveyard-visually-hidden {

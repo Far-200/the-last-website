@@ -11,8 +11,8 @@ import LastMessage from "./scenes/LastMessage/LastMessage";
 // reaches into a scene's internals or decides when a scene is done:
 //
 //   onConnected           Prelude, from its [ ENTER ARCHIVE ] action only
-//   onThresholdCrossed    Feed, once its fade-to-black at the aperture
-//                         completes
+//   onThresholdCrossed    Feed, once its own fog and lights have
+//                         swallowed the final forward motion
 //   onVerificationComplete Graveyard, once the CAPTCHA's verification has
 //                         failed, the warm cue has appeared and its exit
 //                         fade has finished
@@ -23,9 +23,10 @@ import LastMessage from "./scenes/LastMessage/LastMessage";
 //                         played out (see LastMessage.jsx's "ended" phase)
 //
 // Every one of those (other than onRestart, which is an explicit user
-// choice at a deliberately quiet moment) fires from the end of a
-// completed transition, so the mount swap always happens behind a fully
-// opaque overlay and is never visible.
+// choice at a deliberately quiet moment) fires at the end of a completed
+// local transition. Feed -> Graveyard swaps at a uniform cold-dark
+// atmospheric frame, then Graveyard owns the matching reveal; the other
+// boundaries retain their own authored concealment.
 //
 // There is no separate "ended" scene here. LastMessage's own post-thesis
 // state is a phase inside that component, not a sixth mounted scene —

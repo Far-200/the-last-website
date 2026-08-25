@@ -3,11 +3,10 @@
 // Top-level Graveyard composition. Mirrors Feed.jsx's pattern: owns the
 // normalized progression value in a ref (not React state — wheel events
 // fire far more often than a render needs to happen) and the scene's
-// wheel input. Mounts only after Feed's own threshold-crossing fade
-// completes (see Feed.jsx's onThresholdCrossed and App.jsx) — by the
-// time this mounts the screen is already fully black from that fade, so
-// the entrance overlay below is what actually reveals the Graveyard
-// rather than a page-load flash, and the swap itself is never visible.
+// wheel input. Mounts only after Feed has swallowed itself into its own
+// cold haze. Its own arrival ref then carries the other side of that
+// spatial match cut: GraveyardScene owns the camera/atmosphere reveal,
+// while this component only owns timing and input gating.
 //
 // It also owns the CAPTCHA's verification sequence, following the
 // Prelude's pattern rather than inventing a second one: a single GSAP
@@ -59,6 +58,8 @@ const PROGRESS_PER_PIXEL = 0.00007;
 // arrived, and waiting for exactly 1.0 would leave the control dead at
 // what already looks like the end of the route.
 const ARM_AT = 0.99;
+const ARRIVAL_DURATION = 1.55;
+const ARRIVAL_DURATION_REDUCED = 0.35;
 
 // The visual recognition curve — strange rows of markers among dead
 // infrastructure, then individual graves becoming readable, then the
@@ -93,11 +94,14 @@ export default function Graveyard({ onVerificationComplete }) {
   const reduceMotion = usePrefersReducedMotion();
   const rootRef = useRef(null);
   const progressRef = useRef(0);
-  const entranceRef = useRef(null);
   const leaveRef = useRef(null);
-  const entranceTlRef = useRef(null);
   const verifyTlRef = useRef(null);
+  const arrivalProgressRef = useRef(0);
+  const arrivalTweenRef = useRef(null);
+  const arrivalStartedRef = useRef(false);
+  const arrivingRef = useRef(true);
   const [stage, setStage] = useState(0);
+  const [arrivalPhase, setArrivalPhase] = useState("arrival");
 
   // Phase lives in a ref as well as state. The ref is the guard the wheel
   // handler and the activation handler read, because both must make a
@@ -112,21 +116,32 @@ export default function Graveyard({ onVerificationComplete }) {
     setPhase(next);
   }, []);
 
-  useEffect(() => {
-    const tl = gsap.timeline();
-    entranceTlRef.current = tl;
-    tl.to(entranceRef.current, {
-      opacity: 0,
-      duration: reduceMotion ? 0.25 : 2.2,
-      ease: "power1.out",
-      delay: reduceMotion ? 0.05 : 0.3,
-    });
-    return () => tl.kill();
-  }, [reduceMotion]);
-
   // Killed on unmount so no tween can write to a detached node and no
   // callback can fire against a component that is gone.
   useEffect(() => () => verifyTlRef.current?.kill(), []);
+  useEffect(() => () => arrivalTweenRef.current?.kill(), []);
+
+  // Starts from GraveyardScene's first actual rendered frame rather than
+  // mount, so geometry creation and GPU upload cannot consume the visible
+  // duration of this side of the match cut.
+  const handleSceneReady = useCallback(() => {
+    if (arrivalStartedRef.current) return;
+    arrivalStartedRef.current = true;
+    arrivalTweenRef.current = gsap.to(arrivalProgressRef, {
+      current: 1,
+      duration: reduceMotion ? ARRIVAL_DURATION_REDUCED : ARRIVAL_DURATION,
+      ease: "none",
+      onComplete: () => {
+        arrivalProgressRef.current = 1;
+        arrivingRef.current = false;
+        setArrivalPhase("interactive");
+      },
+    });
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (arrivalPhase === "interactive") rootRef.current?.focus({ preventScroll: true });
+  }, [arrivalPhase]);
 
   const handleActivate = useCallback(() => {
     if (phaseRef.current !== "armed") return;
@@ -172,6 +187,9 @@ export default function Graveyard({ onVerificationComplete }) {
       // Always prevented, even while locked — otherwise the page itself
       // would take over the gesture during verification.
       event.preventDefault();
+      // Arrival is not route progress. Input during it is deliberately
+      // discarded so the normal route still begins at its authored start.
+      if (arrivingRef.current) return;
       // Progression stops the moment the visitor commits. Letting the
       // camera keep travelling under a running verification sequence
       // would pull the monument out of frame mid-beat.
@@ -201,19 +219,26 @@ export default function Graveyard({ onVerificationComplete }) {
   }, [goto]);
 
   return (
-    <div className="graveyard-root" ref={rootRef}>
+    <div
+      className="graveyard-root"
+      ref={rootRef}
+      tabIndex={-1}
+      data-arrival={arrivalPhase}
+    >
       <div className="graveyard-canvas-layer">
         <GraveyardScene
           progressRef={progressRef}
           reduceMotion={reduceMotion}
           captchaPhase={phase}
           onCaptchaActivate={handleActivate}
+          arrival={arrivalPhase === "arrival"}
+          arrivalProgressRef={arrivalProgressRef}
+          onReady={arrivalPhase === "arrival" ? handleSceneReady : undefined}
         />
       </div>
 
       <div className="graveyard-vignette" aria-hidden="true" />
 
-      <div ref={entranceRef} className="graveyard-entrance-overlay" aria-hidden="true" />
       <div ref={leaveRef} className="graveyard-leave-overlay" aria-hidden="true" />
 
       <div className="graveyard-hud" aria-hidden="true">

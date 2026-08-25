@@ -43,15 +43,13 @@
 // (see FeedArchitecture's APERTURE_Z vs ROUTE_END_Z) — the same
 // proportion the aperture's own fog-exempt backdrop plane already uses
 // to stay a distant destination rather than a wall the camera hits. So
-// "crossing" it is authored as reaching the end of the scroll route,
-// not clipping through geometry: progress hitting 1 freezes further
-// input and fires a single GSAP fade to black (FeedScene dims the key/
-// fill/aperture lights and compresses fog toward that same point, so
-// the light visibly weakens rather than paying off). Only once the
-// screen is fully black does `onThresholdCrossed` fire, so App's scene
-// swap to Graveyard is never visible as a swap. Unchanged by the
-// arrival work above — the arrival ref and the threshold-exit ref never
-// overlap in time (progress cannot reach 1 while progress is held at 0).
+// "crossing" it is authored as reaching the end of the scroll route, not
+// clipping through geometry. Progress hitting 1 freezes input and starts a
+// short leaving ref. FeedCamera captures the actual damped pose on that
+// phase's first frame and continues it into the haze; FeedScene collapses
+// its existing fog and lights late in the same beat. `onThresholdCrossed`
+// fires only at the resulting uniform cold-dark frame, where App can keep
+// its exclusive mount swap without it reading as a page transition.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
@@ -96,22 +94,24 @@ const PROGRESS_PER_PIXEL = 0.00012;
 // WAYPOINTS[0] the whole time costs nothing extra to support).
 const ARRIVAL_DURATION = 1.4;
 const ARRIVAL_DURATION_REDUCED = 0.35;
+const LEAVING_DURATION = 1.2;
+const LEAVING_DURATION_REDUCED = 0.35;
 
 export default function Feed({ onThresholdCrossed }) {
   const reduceMotion = usePrefersReducedMotion();
   const rootRef = useRef(null);
   const progressRef = useRef(0);
-  const overlayRef = useRef(null);
-  const crossingRef = useRef(false);
+  const leavingRef = useRef(false);
   const arrivingRef = useRef(true);
-  const timelineRef = useRef(null);
   const arrivalProgressRef = useRef(0);
   const arrivalTweenRef = useRef(null);
+  const leavingProgressRef = useRef(0);
+  const leavingTweenRef = useRef(null);
   const arrivalStartedRef = useRef(false);
   const [arrivalPhase, setArrivalPhase] = useState("arrival");
 
-  useEffect(() => () => timelineRef.current?.kill(), []);
   useEffect(() => () => arrivalTweenRef.current?.kill(), []);
+  useEffect(() => () => leavingTweenRef.current?.kill(), []);
 
   // Started from FeedScene's onReady (its first actually-rendered frame),
   // not from this component's own mount effect. Starting it at mount
@@ -155,13 +155,15 @@ export default function Feed({ onThresholdCrossed }) {
     if (arrivalPhase === "interactive") rootRef.current?.focus({ preventScroll: true });
   }, [arrivalPhase]);
 
-  const beginCrossing = useCallback(() => {
-    const tl = gsap.timeline({ onComplete: () => onThresholdCrossed?.() });
-    timelineRef.current = tl;
-    tl.to(overlayRef.current, {
-      opacity: 1,
-      duration: reduceMotion ? 0.4 : 1.3,
-      ease: "power2.in",
+  const beginLeaving = useCallback(() => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    setArrivalPhase("leaving");
+    leavingTweenRef.current = gsap.to(leavingProgressRef, {
+      current: 1,
+      duration: reduceMotion ? LEAVING_DURATION_REDUCED : LEAVING_DURATION,
+      ease: "none",
+      onComplete: () => onThresholdCrossed?.(),
     });
   }, [reduceMotion, onThresholdCrossed]);
 
@@ -180,21 +182,20 @@ export default function Feed({ onThresholdCrossed }) {
       // No buffering: input during arrival is discarded outright rather
       // than queued, so nothing accumulated jumps the camera forward the
       // instant arrival ends.
-      if (arrivingRef.current || crossingRef.current) return;
+      if (arrivingRef.current || leavingRef.current) return;
 
       const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
       const next = Math.min(1, Math.max(0, progressRef.current + pixelDelta * PROGRESS_PER_PIXEL));
       progressRef.current = next;
 
       if (next >= 1) {
-        crossingRef.current = true;
-        beginCrossing();
+        beginLeaving();
       }
     };
 
     node.addEventListener("wheel", handleWheel, { passive: false });
     return () => node.removeEventListener("wheel", handleWheel);
-  }, [beginCrossing]);
+  }, [beginLeaving]);
 
   return (
     // tabIndex so focus can land here once arrival completes (see the
@@ -209,13 +210,13 @@ export default function Feed({ onThresholdCrossed }) {
           reduceMotion={reduceMotion}
           arrival={arrivalPhase === "arrival"}
           arrivalProgressRef={arrivalProgressRef}
+          leaving={arrivalPhase === "leaving"}
+          leavingProgressRef={leavingProgressRef}
           onReady={arrivalPhase === "arrival" ? handleSceneReady : undefined}
         />
       </div>
 
       <div className="feed-vignette" aria-hidden="true" />
-
-      <div ref={overlayRef} className="feed-threshold-overlay" aria-hidden="true" />
 
       <div className="feed-hud" aria-hidden="true">
         ARCHIVE // FEED

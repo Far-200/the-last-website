@@ -29,11 +29,13 @@
 // GraveyardArchitecture's HORIZON, because that is the value the
 // backdrop gradient already is at eye level. Matching them is what makes
 // distant ground dissolve into the sky instead of meeting it at a seam.
-// `far` is pushed out to 520 so the monument at 306 units is only
-// partially fogged and genuinely emerges over the approach.
+// The resting far plane is 380: dense enough that the monument emerges
+// over the approach rather than reading as an opening objective, while
+// still clear enough for its closing frame.
 
 import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import GraveyardCamera from "./GraveyardCamera";
 import GraveyardArchitecture, { EYE_HEIGHT, HORIZON } from "./GraveyardArchitecture";
 import GraveyardRelics from "./GraveyardRelics";
@@ -64,6 +66,57 @@ import { groundHeightAt } from "./groundHeight";
 const WARM_X = -16;
 const WARM_Z = -332;
 const WARM_BY_PHASE = { warming: 1, leaving: 1.35 };
+const TRANSITION_DARK = "#0d1112";
+
+function ReadySignal({ onReady }) {
+  const firedRef = useRef(false);
+  useFrame(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onReady?.();
+  });
+  return null;
+}
+
+// Owns the scene fog and its two general lights for both arrival and
+// ordinary progression. Monument-local lights remain owned by the
+// monument. The same backloaded reveal is passed to Backdrop so its
+// fog-exempt sky cannot resolve before fogged geometry does.
+function Atmosphere({ arrival, arrivalProgressRef }) {
+  const fogRef = useRef(null);
+  const hemiRef = useRef(null);
+  const keyRef = useRef(null);
+  const transitionColor = useRef(new THREE.Color(TRANSITION_DARK));
+  const horizonColor = useRef(new THREE.Color(HORIZON));
+  const fogColor = useRef(new THREE.Color());
+
+  useFrame(() => {
+    const raw = arrival ? THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1) : 1;
+    const reveal = arrival ? Math.pow(raw, 3.2) : 1;
+    fogColor.current.lerpColors(transitionColor.current, horizonColor.current, reveal);
+
+    if (fogRef.current) {
+      fogRef.current.color.copy(fogColor.current);
+      fogRef.current.near = THREE.MathUtils.lerp(0.8, 40, reveal);
+      fogRef.current.far = THREE.MathUtils.lerp(6.5, 380, reveal);
+    }
+    if (hemiRef.current) hemiRef.current.intensity = 1.5 * (0.05 + 0.95 * reveal);
+    if (keyRef.current) keyRef.current.intensity = 2.4 * (0.05 + 0.95 * reveal);
+  });
+
+  return (
+    <>
+      <fog ref={fogRef} attach="fog" args={[TRANSITION_DARK, 0.8, 6.5]} />
+      <hemisphereLight ref={hemiRef} args={["#1a2023", "#040506", 0.075]} />
+      <directionalLight
+        ref={keyRef}
+        position={[-120, 62, -400]}
+        intensity={0.12}
+        color="#88959a"
+      />
+    </>
+  );
+}
 
 function WarmCue({ phase, reduceMotion }) {
   const lightRef = useRef(null);
@@ -117,6 +170,9 @@ export default function GraveyardScene({
   reduceMotion,
   captchaPhase,
   onCaptchaActivate,
+  arrival = false,
+  arrivalProgressRef,
+  onReady,
 }) {
   return (
     <Canvas
@@ -124,32 +180,17 @@ export default function GraveyardScene({
       camera={{ position: START, fov: 50, near: 0.4, far: 900 }}
       gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
     >
-      {/* `far` pulled in from 520 to 380 in the staging pass, and it is
-          doing narrative work rather than atmospheric tuning. The
-          monument carries its own uplight, so at the old density it
-          stayed a legible pale structure from the route's first frame —
-          only 41% washed out at mid-route — and a landmark that is
-          clearly resolved from the start is an objective, not a
-          discovery. At 380 it is ~87% washed into the horizon at the
-          entry and ~58% at mid-route, so it emerges instead of waiting.
-          The closing approach is only ~7% fogged, so the hero frame is
-          untouched. */}
-      <fog attach="fog" args={[HORIZON, 40, 380]} />
+      {onReady && <ReadySignal onReady={onReady} />}
+      <Atmosphere arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
 
-      {/* Indirect base only. The sky term keeps upward-facing surfaces
-          from crushing to black; the ground term is near-black so
-          undersides stay unresolved. */}
-      <hemisphereLight args={["#1a2023", "#040506", 1.5]} />
+      <GraveyardCamera
+        progressRef={progressRef}
+        reduceMotion={reduceMotion}
+        arrival={arrival}
+        arrivalProgressRef={arrivalProgressRef}
+      />
 
-      {/* The grazing key — see the header. Placed behind and to one side
-          of the monument at roughly 9 degrees of elevation, so it rakes
-          back up the route toward the camera and reads as rim and relief
-          rather than as illumination. */}
-      <directionalLight position={[-120, 62, -400]} intensity={2.4} color="#88959a" />
-
-      <GraveyardCamera progressRef={progressRef} reduceMotion={reduceMotion} />
-
-      <GraveyardArchitecture />
+      <GraveyardArchitecture arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
       <GraveyardRelics />
       <GraveyardMemorials />
       <GraveyardCaptcha

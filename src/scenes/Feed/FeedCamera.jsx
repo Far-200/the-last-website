@@ -12,7 +12,7 @@
 // happens once, at the progress level, so both position and look
 // direction come out smooth together instead of needing separate easing.
 //
-// Arrival
+// Arrival and departure
 // -------
 // Feed mounts a few units further back on its own route than its normal
 // t=0 rest position, with progress genuinely held at 0 (Feed.jsx does not
@@ -25,7 +25,10 @@
 // when arrival flips off and normal progress-driven control resumes
 // (dampedProgress is still 0 at that point), there is no position
 // discontinuity — arrival simply stops writing and progress-driven control
-// picks up from the exact frame it left off on.
+// picks up from the exact frame it left off on. Departure uses the inverse
+// discipline: on its first frame it captures the camera pose actually
+// rendered by normal damping, then continues that captured horizontal gaze
+// briefly into the fog. It never snaps to the authored final waypoint.
 //
 // Look direction
 // --------------
@@ -79,16 +82,24 @@ const LOOK_RISE = 1.4;
 export const ARRIVAL_DISTANCE = 6;
 const ARRIVAL_START = new THREE.Vector3(0, EYE_HEIGHT, ROUTE_START_Z + ARRIVAL_DISTANCE);
 const ARRIVAL_END = new THREE.Vector3(...WAYPOINTS[0]);
+const LEAVING_DISTANCE = 12;
 
 export default function FeedCamera({
   progressRef,
   reduceMotion = false,
   arrival = false,
   arrivalProgressRef,
+  leaving = false,
+  leavingProgressRef,
 }) {
   const dampedProgress = useRef(0);
   const tmpPosition = useRef(new THREE.Vector3());
   const tmpLookAt = useRef(new THREE.Vector3());
+  const leavingStarted = useRef(false);
+  const leavingStart = useRef(new THREE.Vector3());
+  const leavingEnd = useRef(new THREE.Vector3());
+  const leavingDirection = useRef(new THREE.Vector3());
+  const leavingHorizontal = useRef(new THREE.Vector3());
 
   const path = useMemo(
     () => new THREE.CatmullRomCurve3(WAYPOINTS.map((p) => new THREE.Vector3(...p))),
@@ -96,6 +107,32 @@ export default function FeedCamera({
   );
 
   useFrame(({ camera }, delta) => {
+    if (leaving) {
+      if (!leavingStarted.current) {
+        leavingStarted.current = true;
+        leavingStart.current.copy(camera.position);
+        camera.getWorldDirection(leavingDirection.current);
+        leavingHorizontal.current.copy(leavingDirection.current);
+        leavingHorizontal.current.y = 0;
+        leavingHorizontal.current.normalize();
+        leavingEnd.current
+          .copy(leavingStart.current)
+          .addScaledVector(leavingHorizontal.current, LEAVING_DISTANCE);
+      }
+
+      const raw = THREE.MathUtils.clamp(leavingProgressRef?.current ?? 1, 0, 1);
+      const eased = 1 - (1 - raw) * (1 - raw);
+      if (!reduceMotion) {
+        tmpPosition.current.lerpVectors(leavingStart.current, leavingEnd.current, eased);
+        camera.position.copy(tmpPosition.current);
+      }
+      tmpLookAt.current.copy(camera.position).addScaledVector(leavingDirection.current, LOOK_DISTANCE);
+      camera.lookAt(tmpLookAt.current);
+      return;
+    }
+
+    leavingStarted.current = false;
+
     if (arrival) {
       // Progress-driven damping never starts while arriving — dampedProgress
       // stays exactly 0, so the instant arrival ends, normal control resumes

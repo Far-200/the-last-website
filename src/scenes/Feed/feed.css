@@ -46,20 +46,6 @@
   background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.5) 100%);
 }
 
-/* Opacity 0 at rest, faded to 1 by a single GSAP timeline once progress
-   reaches the route's end (see Feed.jsx's beginCrossing) — the
-   threshold crossing into Graveyard. A one-shot authored moment, not a
-   continuous effect, so it stays GSAP's territory rather than the
-   progression system's. */
-.feed-threshold-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  background: #000;
-  opacity: 0;
-}
-
 /* Deliberately restrained — the 3D archive is the interface, this is a
    small orientation mark, not a HUD. Held at 0 and faded in after a
    delay rather than present from the first frame: DOM chrome popping in
@@ -79,6 +65,12 @@
   opacity: 0;
   pointer-events: none;
   animation: feed-hud-in 0.9s ease 0.5s forwards;
+  transition: opacity 0.2s ease;
+}
+
+.feed-root[data-arrival="leaving"] .feed-hud {
+  animation: none;
+  opacity: 0;
 }
 
 @keyframes feed-hud-in {

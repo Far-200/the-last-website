@@ -46,7 +46,8 @@ export const HAZE = "#0d1112";
 // Where the "instead of being rewarded with brightness, the light
 // weakens" response starts, as a fraction of the route's own progress
 // (not raw distance) — the last stretch before Feed.jsx's own
-// progress===1 threshold fires the fade-to-black handoff.
+// progress===1 handoff. Its leaving phase layers onto this response so
+// Feed's own haze, rather than a DOM overlay, hides the exclusive swap.
 const THRESHOLD_START = 0.88;
 
 // Arrival-side counterpart to THRESHOLD_START's exit dimming: the fog
@@ -69,7 +70,14 @@ const ARRIVAL_DIM_FLOOR = 0.06;
 // arrival), so there is never a conflict about which one is "in charge"
 // on a given frame — the two blends simply multiply together, and
 // whichever one is inactive contributes exactly 1.
-function Atmosphere({ progressRef, reduceMotion, arrival, arrivalProgressRef }) {
+function Atmosphere({
+  progressRef,
+  reduceMotion,
+  arrival,
+  arrivalProgressRef,
+  leaving,
+  leavingProgressRef,
+}) {
   const hemiRef = useRef(null);
   const keyRef = useRef(null);
   const fillRef = useRef(null);
@@ -107,14 +115,23 @@ function Atmosphere({ progressRef, reduceMotion, arrival, arrivalProgressRef }) 
     // deceleration independent of this.
     const revealT = arrival ? Math.pow(at, 5) : 1;
     const arrivalDim = arrival ? ARRIVAL_DIM_FLOOR + (1 - ARRIVAL_DIM_FLOOR) * revealT : 1;
+    // Keep the forward move readable until late, then collapse the
+    // already-dim threshold atmosphere around the camera.
+    const leaveRaw = leaving ? THREE.MathUtils.clamp(leavingProgressRef?.current ?? 1, 0, 1) : 0;
+    const swallowT = Math.pow(leaveRaw, 3);
+    const leavingDim = 1 - swallowT * 0.96;
 
-    if (hemiRef.current) hemiRef.current.intensity = 12 * arrivalDim;
-    if (keyRef.current) keyRef.current.intensity = 9 * exitDim.key * arrivalDim;
-    if (fillRef.current) fillRef.current.intensity = 10 * exitDim.fill * arrivalDim;
-    if (apertureRef.current) apertureRef.current.intensity = 1900 * exitDim.aperture * arrivalDim;
+    if (hemiRef.current) hemiRef.current.intensity = 12 * arrivalDim * leavingDim;
+    if (keyRef.current) keyRef.current.intensity = 9 * exitDim.key * arrivalDim * leavingDim;
+    if (fillRef.current) fillRef.current.intensity = 10 * exitDim.fill * arrivalDim * leavingDim;
+    if (apertureRef.current) {
+      apertureRef.current.intensity = 1900 * exitDim.aperture * arrivalDim * leavingDim;
+    }
     if (fogRef.current) {
-      fogRef.current.near = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[0], baseNear, revealT) : baseNear;
-      fogRef.current.far = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[1], baseFar, revealT) : baseFar;
+      const near = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[0], baseNear, revealT) : baseNear;
+      const far = arrival ? THREE.MathUtils.lerp(ARRIVAL_FOG[1], baseFar, revealT) : baseFar;
+      fogRef.current.near = THREE.MathUtils.lerp(near, 0.8, swallowT);
+      fogRef.current.far = THREE.MathUtils.lerp(far, 6.5, swallowT);
     }
   });
 
@@ -177,6 +194,8 @@ export default function FeedScene({
   reduceMotion,
   arrival = false,
   arrivalProgressRef,
+  leaving = false,
+  leavingProgressRef,
   onReady,
 }) {
   return (
@@ -206,6 +225,8 @@ export default function FeedScene({
         reduceMotion={reduceMotion}
         arrival={arrival}
         arrivalProgressRef={arrivalProgressRef}
+        leaving={leaving}
+        leavingProgressRef={leavingProgressRef}
       />
 
       <FeedCamera
@@ -213,6 +234,8 @@ export default function FeedScene({
         reduceMotion={reduceMotion}
         arrival={arrival}
         arrivalProgressRef={arrivalProgressRef}
+        leaving={leaving}
+        leavingProgressRef={leavingProgressRef}
       />
 
       <FeedArchitecture />
