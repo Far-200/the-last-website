@@ -657,45 +657,27 @@ function HeroMemorials() {
 }
 
 // --- Anonymous filler field: an actual row generator ------------------
-// A rejection-sampled random scatter across a +-130 unit half-width was
-// tried first and failed: the overwhelming majority of accepted points
-// landed 40-130 units off the route, far past any distance at which a
-// grave-sized object registers at normal viewing size, so the aggregate
-// still read as empty terrain with a handful of legible props rather than
-// a graveyard. This generates actual ROWS instead: fixed lateral bands
-// (ROW_BANDS) on each side of the route, each running the length of a
-// burial SECTION at regular-ish spacing, so the graves that exist are the
-// graves that are actually seen.
+// A rejection-sampled scatter, then long rows running parallel to the
+// route, both failed the normal-viewport read: they made markers feel like
+// debris beside a road. The field now builds short, transverse cemetery
+// rows. Each row crosses one side of the route from the near plot toward
+// the fog, so the repeated z positions and the empty strips between them
+// read as graves, walkway, graves rather than as a continuous roadside.
 //
-// Row bands were chosen from the same camera-frustum simulation used for
-// hero placement (see graveyardRelics.js's header): band 0 stays within
-// 16-23 units of the camera at its closest approach almost everywhere on
-// the route (the front row — the one that has to read instantly), band 1
-// recedes to a genuine second rank at 34-48 units, and band 2 is the one
-// meant to dissolve into fog at 60-80 units. The GAP between adjacent
-// bands is the walkway: negative space in lateral offset, which by
-// construction can never read as a corridor pointing at the CAPTCHA,
-// because a lateral gap and a forward runway are different axes.
-//
-// Burial SECTIONS give the route a density rhythm rather than one
-// undifferentiated field: sparser at the entry (rows are just starting to
-// establish themselves), tightening through the middle (the strongest
-// cemetery identity), and easing slightly on the final approach so the
-// CAPTCHA still has room to dominate late without the rows stopping dead.
-// Existing infrastructure (OBSTACLES below) breaks rows where it already
-// stands, which reads as the graveyard having grown up around the ruins
-// rather than the ruins being dropped into a finished cemetery.
-const ROW_BANDS = [
-  { center: 9.5, half: 2.5, skip: 0.1 },
-  { center: 20, half: 4, skip: 0.22 },
-  { center: 34, half: 5.5, skip: 0.34 },
-];
+// These slots retain the camera-tested 9-35 unit range used by the hero
+// memorials: the first two are the immediately legible plots, while the
+// outer two soften into the fog. Their uneven gaps create narrow plot
+// lanes without turning the burial ground into a perfect grid.
+const PLOT_SLOTS = [9.5, 14.5, 21, 27.5, 35.5];
 
+// The gaps between sections are intentional cross-lanes. The centre
+// sections tighten into the strongest cemetery read, then the final one
+// stops well before the CAPTCHA so its existing reveal remains clear.
 const SECTIONS = [
-  { z0: 26, z1: -58, spacing: 10 }, // entry: rows establishing themselves
-  { z0: -58, z1: -134, spacing: 6.5 }, // mid-early: cut through by racks/spinner
-  { z0: -134, z1: -246, spacing: 5.5 }, // peak: strongest cemetery identity
-  { z0: -246, z1: -400, spacing: 7.5 }, // approach: eases so the CAPTCHA can dominate
+  { z0: 22, z1: -38, spacing: 12, damage: 0.28 },
+  { z0: -58, z1: -118, spacing: 9, damage: 0.18 },
+  { z0: -140, z1: -214, spacing: 8, damage: 0.14 },
+  { z0: -238, z1: -292, spacing: 10, damage: 0.24 },
 ];
 
 // Existing relic/tower anchors (TOWERS/FALLEN in GraveyardArchitecture.jsx,
@@ -736,40 +718,55 @@ function violatesObstacle(x, z) {
 
 const HERO_CLEARANCE = 3.5;
 
-// Row-band offsets (7+ at their nearest) are already well clear of the
-// route the camera walks (which stays within a couple of units of
-// routeXAt), so no separate route-clearance check is needed here the way
-// the old rejection-sampled field required one.
 function buildGraveRows() {
   const rand = mulberry32(90210);
   const slots = [];
 
-  for (const side of [-1, 1]) {
-    for (let bandIndex = 0; bandIndex < ROW_BANDS.length; bandIndex++) {
-      const band = ROW_BANDS[bandIndex];
-      for (const section of SECTIONS) {
-        let z = section.z0;
-        while (z > section.z1) {
-          const zPos = z + (rand() - 0.5) * section.spacing * 0.6;
-          const xPos = routeXAt(zPos) + side * (band.center + (rand() - 0.5) * band.half * 2);
-          const skip = rand() < band.skip;
+  for (const [sectionIndex, section] of SECTIONS.entries()) {
+    let z = section.z0;
+    let rowIndex = 0;
+    while (z > section.z1) {
+      // Most of the drift belongs to the entire row; individual graves only
+      // wander a little so the shared alignment remains visible at distance.
+      const rowZ = z + (rand() - 0.5) * 1.8;
+      const rowX = routeXAt(rowZ);
 
-          if (!skip && !violatesObstacle(xPos, zPos)) {
-            let nearHero = false;
-            for (const m of heroMemorials) {
-              const [hx, hz] = m.position;
-              const dx = hx - xPos;
-              const dz = hz - zPos;
-              if (dx * dx + dz * dz < HERO_CLEARANCE * HERO_CLEARANCE) {
-                nearHero = true;
-                break;
-              }
+      for (const side of [-1, 1]) {
+        for (let slotIndex = 0; slotIndex < PLOT_SLOTS.length; slotIndex++) {
+          const damaged = rand() < section.damage;
+          if (damaged && rand() < 0.62) continue;
+
+          const displaced = damaged;
+          const zPos = rowZ + (rand() - 0.5) * 1.1 + (displaced ? (rand() - 0.5) * 4 : 0);
+          const xPos =
+            rowX +
+            side * (PLOT_SLOTS[slotIndex] + (rand() - 0.5) * 0.8 + (displaced ? rand() * 2 : 0));
+
+          if (violatesObstacle(xPos, zPos)) continue;
+
+          let nearHero = false;
+          for (const m of heroMemorials) {
+            const [hx, hz] = m.position;
+            const dx = hx - xPos;
+            const dz = hz - zPos;
+            if (dx * dx + dz * dz < HERO_CLEARANCE * HERO_CLEARANCE) {
+              nearHero = true;
+              break;
             }
-            if (!nearHero) slots.push({ x: xPos, z: zPos, bandIndex });
           }
-          z -= section.spacing;
+          if (!nearHero) {
+            slots.push({
+              x: xPos,
+              z: zPos,
+              bandIndex: slotIndex,
+              id: `${sectionIndex}-${rowIndex}-${side}-${slotIndex}`,
+              damaged: displaced,
+            });
+          }
         }
       }
+      z -= section.spacing;
+      rowIndex++;
     }
   }
 
@@ -792,16 +789,19 @@ function FillerGraves() {
     for (const p of points) {
       const y = groundHeightAt(p.x, p.z);
       const isBox = rand() < 0.58;
-      const lean = (rand() - 0.5) * 0.34;
+      const broken = p.damaged && rand() < 0.46;
+      const lean = (rand() - 0.5) * (broken ? 0.9 : 0.34);
       const leanAxis = rand() * Math.PI * 2;
-      const rotY = rand() * Math.PI * 2;
+      const rotY = facingYaw(p.x, p.z, p.id);
       // The near band (0) is scaled a little larger on average than the
       // far band (2) — reinforcing the sense of depth a receding row
       // should have, on top of what perspective already does.
       const bandLift = 1 - p.bandIndex * 0.08;
-      const heightScale = (0.62 + rand() * 0.85) * bandLift;
+      let heightScale = (0.62 + rand() * 0.85) * bandLift;
       const widthScale = (0.78 + rand() * 0.45) * bandLift;
       const sink = 0.02 + rand() * 0.14;
+
+      if (broken) heightScale *= 0.38 + rand() * 0.18;
 
       dummy.position.set(p.x, y - sink, p.z);
       dummy.rotation.set(Math.cos(leanAxis) * lean, rotY, Math.sin(leanAxis) * lean);
