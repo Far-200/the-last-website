@@ -34,6 +34,7 @@ import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import MemoriesCamera from "./MemoriesCamera";
 import MemoriesArchitecture from "./MemoriesArchitecture";
+import MemoriesResidue from "./MemoriesResidue";
 import MemoryFragment from "./MemoryFragment";
 import MemoryFragmentVoicemail from "./MemoryFragmentVoicemail";
 import MemoryFragmentPhoto from "./MemoryFragmentPhoto";
@@ -119,6 +120,7 @@ export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
       <MemoriesCamera progressRef={progressRef} reduceMotion={reduceMotion} />
 
       <MemoriesArchitecture phase={phase} reduceMotion={reduceMotion} />
+      <MemoriesResidue />
       <MemoryFragment phase={phase} reduceMotion={reduceMotion} />
       <MemoryFragmentVoicemail phase={phase} reduceMotion={reduceMotion} />
       <MemoryFragmentPhoto phase={phase} reduceMotion={reduceMotion} />
