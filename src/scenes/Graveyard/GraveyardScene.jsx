@@ -37,6 +37,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import GraveyardCamera from "./GraveyardCamera";
 import GraveyardArchitecture, { EYE_HEIGHT, HORIZON } from "./GraveyardArchitecture";
 import GraveyardRelics from "./GraveyardRelics";
+import GraveyardMemorials from "./GraveyardMemorials";
 import GraveyardCaptcha from "./GraveyardCaptcha";
 import { groundHeightAt } from "./groundHeight";
 
@@ -150,6 +151,7 @@ export default function GraveyardScene({
 
       <GraveyardArchitecture />
       <GraveyardRelics />
+      <GraveyardMemorials />
       <GraveyardCaptcha
         progressRef={progressRef}
         reduceMotion={reduceMotion}

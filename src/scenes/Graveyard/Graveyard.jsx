@@ -60,16 +60,19 @@ const PROGRESS_PER_PIXEL = 0.00007;
 // what already looks like the end of the route.
 const ARM_AT = 0.99;
 
-// The visual recognition curve — distant shape, then dead infrastructure,
-// then the monument resolving into a CAPTCHA — is carried entirely by
-// geometry, fog and an emissive ramp, none of which a screen reader can
-// reach. These stages mirror it in text so the same narrative arrives
-// non-visually. Deliberately coarse: three states across the whole route
-// means at most two re-renders, so this never touches the per-frame path.
+// The visual recognition curve — strange rows of markers among dead
+// infrastructure, then individual graves becoming readable, then the
+// rows multiplying into the fog, then the monument resolving into a
+// CAPTCHA — is carried entirely by geometry, fog and an emissive ramp,
+// none of which a screen reader can reach. These stages mirror it in text
+// so the same narrative arrives non-visually. Deliberately coarse: three
+// states across the whole route means at most two re-renders, so this
+// never touches the per-frame path, and it never lists the individual
+// graves by name — the visual scene doesn't either.
 const NARRATION = [
-  "The archive opens onto open, empty ground. Far ahead, one tall shape stands alone. Scroll to move forward.",
-  "Collapsed relay towers and server racks pass in the dark. The shape ahead is too regular to be a ruin.",
-  "The structure resolves into an enormous interface built as a monument. It reads: prove you are human. I am not a robot. Nothing is left to answer it.",
+  "The archive opens onto open ground. Low stone markers stand in irregular rows among the wreckage, some leaning, some half buried. Far ahead, one tall shape stands alone. Scroll to move forward.",
+  "Passing close, the markers resolve into names, dates and small worn symbols — things that were, for a while, everywhere. Collapsed relay towers and server racks stand among them. The shape ahead is too regular to be a ruin.",
+  "The rows multiply into the fog, closer together the further they go. The structure resolves into an enormous interface built as a monument. It reads: prove you are human. I am not a robot. Nothing is left to answer it.",
 ];
 const STAGE_AT = [0, 0.3, 0.72];
 

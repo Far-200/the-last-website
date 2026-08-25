@@ -1,9 +1,12 @@
 // src/scenes/Graveyard/GraveyardArchitecture.jsx
 //
-// The Graveyard's environment: open, horizontal, almost empty. Where
-// Feed enclosed the visitor in a colonnaded nave, this removes the
-// enclosure entirely. Absence is the composition — the job here is to
-// make that absence readable, not to fill it.
+// The Graveyard's environment shell: ground, sky and the ruined relay
+// infrastructure, open and horizontal. Where Feed enclosed the visitor in
+// a colonnaded nave, this removes the enclosure entirely. This file stays
+// deliberately sparse on its own — the cemetery itself, hero graves and
+// the much larger anonymous field, is population that lives in
+// GraveyardMemorials.jsx and grows out of this aftermath rather than
+// replacing it.
 //
 // Horizon (kept from the composition pass, retuned here)
 // -----------------------------------------------------
@@ -200,10 +203,15 @@ function Backdrop() {
 
 // Shared lattice construction. An earlier pass used a plain post with one
 // angled branch, which read in the render as a leafless tree — and a
-// field of them read as a cemetery, which is exactly wrong for a place
-// where the internet is what died. Paired legs with horizontal rungs and
-// alternating diagonal bracing is the specific feature that makes a
-// distant silhouette read as infrastructure.
+// field of them read as a cemetery, which at the time was exactly wrong:
+// the Graveyard had no actual graves yet, so anything reading as a
+// tombstone was reading as the wrong kind of ruin. That premise is gone —
+// the site now holds a real cemetery of its own (see GraveyardMemorials)
+// — but these towers still need to stay legible as relay infrastructure
+// specifically, not as more grave markers, or the two vocabularies blur
+// into one undifferentiated field of stones. Paired legs with horizontal
+// rungs and alternating diagonal bracing is the specific feature that
+// keeps a distant silhouette reading as a tower.
 function latticeParts(length, spread) {
   const out = [];
   const half = spread / 2;
