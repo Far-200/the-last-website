@@ -24,5 +24,4 @@ dist-ssr
 *.sw?
 
 # Local AI-agent instructions
-CLAUDE.md
 .claude/
