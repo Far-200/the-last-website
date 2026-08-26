@@ -73,8 +73,12 @@ export const APERTURE_Z = -186;
 // under this scene's lighting the near tier now lands in a readable
 // charcoal instead of black-on-black, while distance and fog — not the
 // base value — do the work of pushing things away.
+//
+// Exported so FeedInfrastructure's debris geometry draws from the same
+// mid stone value rather than declaring a near-match that could drift
+// out of step with a future retune here.
 const STONE_NEAR = "#525c57";
-const STONE_MID = "#39423e";
+export const STONE_MID = "#39423e";
 const STONE_FAR = "#232a29";
 const FLOOR_STONE = "#0e1211";
 const PATH_STONE = "#171c1b";

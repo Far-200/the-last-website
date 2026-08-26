@@ -39,7 +39,87 @@ Do not fix visual problems by blindly stacking brightness, opacity, fog-distance
 
 First identify the cause.
 
-## 3. Treat architectural comments as design documentation
+## 3. Art-direction implementation mode
+
+During submission-sprint visual work, treat the existing camera path as part of the level-design brief.
+
+Do not decorate the scene from an abstract top-down view and hope it looks 3D. Build composition around what the visitor actually sees while moving through the authored route.
+
+### Compose around the camera
+
+For density/environment work, actively look for opportunities to create:
+
+- near-camera occluders such as beams, cables, pipes, slabs, ruined machinery, or wall edges;
+- midground story objects that remain readable without floating independently in space;
+- overlapping architectural forms rather than evenly spaced isolated props;
+- overhead structure that the camera passes beneath where appropriate;
+- distant silhouettes that establish scale and disappear naturally into fog;
+- parallax between those layers as the existing camera advances.
+
+Foreground geometry may partially leave the frame or pass close to the camera when that improves depth, but it must not block required interactions or make the authored route unreadable.
+
+Do not interpret “make it more 3D,” “add density,” or “populate the world” as permission to randomly scatter objects.
+
+### Build a coherent environment kit
+
+Prefer a small set of reusable, parameterized R3F environment components over many unrelated one-off meshes.
+
+Useful controlled variations include:
+
+- scale and proportion;
+- lean/rotation;
+- damage amount or missing sections;
+- screen count/placement;
+- cable/pipe routing;
+- local debris;
+- restrained material variation.
+
+Variants should preserve one visual language across the project.
+
+If procedural variation is used, make it deterministic or seeded so important compositions do not change unpredictably between reloads.
+
+### Integrate story surfaces into architecture
+
+For Feed in particular, prefer screens and recovered content that belong to pylons, terminal stacks, walls, billboards, fallen kiosks, or other structures.
+
+Do not default to arrays of floating monitors/cards simply because they are easy to generate.
+
+If world-space text or signage is meant to exist inside the scene, prefer a solution that participates in world depth, fog, occlusion, and tone response where practical.
+
+### Choose procedural geometry versus external assets deliberately
+
+Use procedural R3F geometry for architecture, environmental mass, simple low-poly ruins, cables, pipes, debris families, frames, pylons, and distant structures when it can convincingly produce the intended silhouette.
+
+For recognizable hero or human props—especially in Memories—evaluate whether a lightweight external GLB/glTF asset is more convincing than primitives.
+
+Do not add Blender, a new asset pipeline, or large external models merely because they are available. Introduce them only when they materially improve the visible result within the current submission scope.
+
+### Preserve the authored spine
+
+When art-directing an existing scene:
+
+- preserve its current route, progression, story objects, interaction contract, camera authority, and transition unless the task explicitly requests a change;
+- build the environment around the route before considering camera changes;
+- do not use new geometry to hide transition problems that should be solved by the existing transition contract;
+- do not add visual density to LastMessage simply for consistency with earlier scenes.
+
+### Visual checkpoint before success claims
+
+Before calling visual work successful, inspect representative rendered frames along the affected route when the environment permits.
+
+Evaluate:
+
+- focal hierarchy;
+- foreground/midground/background separation;
+- silhouette overlap;
+- scale cues;
+- dead space versus intentional negative space;
+- lighting/fog hierarchy;
+- whether the scene reads as a place instead of objects placed on a floor.
+
+A clean lint/build result is necessary but is not evidence that the art direction improved.
+
+## 4. Treat architectural comments as design documentation
 
 This repository intentionally contains detailed comments around camera authority, lighting math, atmosphere matching, and transition ownership.
 
@@ -53,7 +133,7 @@ When modifying the behavior they describe:
 
 A shorter file with false or missing rationale is not an improvement.
 
-## 4. Diagnose transitions as four frames
+## 5. Diagnose transitions as four frames
 
 For any transition task, reason explicitly about:
 
@@ -68,7 +148,7 @@ The goal is usually to make the React mount swap visually disappear, not to hide
 
 Preserve forward momentum when the authored transition depends on it.
 
-## 5. Respect the single-writer model
+## 6. Respect the single-writer model
 
 Before adding animation, identify the existing writer.
 
@@ -81,7 +161,7 @@ Particularly for camera/fog/light/material work:
 
 If a phase handoff requires tweening, prefer the existing pattern: GSAP changes a plain ref/timing signal, and the render-loop owner interprets it.
 
-## 6. Preserve local character instead of normalizing scenes
+## 7. Preserve local character instead of normalizing scenes
 
 The five scenes intentionally do not behave identically.
 
@@ -96,7 +176,7 @@ Examples:
 
 Shared code is useful only when it preserves authored differences.
 
-## 7. Copy is product behavior
+## 8. Copy is product behavior
 
 Do not casually rewrite terminal lines, recovered fragments, captions, voicemail text, CAPTCHA language, or the finale.
 
@@ -109,7 +189,7 @@ When the task is not explicitly about copy:
 
 "More cinematic" is usually the wrong direction for this project.
 
-## 8. Do not opportunistically add deferred systems
+## 9. Do not opportunistically add deferred systems
 
 Unless the current task explicitly asks for them, do not use nearby work as an excuse to add:
 
@@ -124,7 +204,7 @@ Unless the current task explicitly asks for them, do not use nearby work as an e
 
 The current LastMessage implementation explicitly leaves project-wide audio for later. Keep it deferred unless audio itself is the task.
 
-## 9. Implementation mode
+## 10. Implementation mode
 
 When asked to implement/fix/refine code, perform the change rather than returning only a design proposal.
 
@@ -137,7 +217,7 @@ Use investigation proportionate to the task:
 
 Avoid speculative rewrites.
 
-## 10. Validation and reporting
+## 11. Validation and reporting
 
 After code changes:
 
@@ -161,7 +241,7 @@ In the final work report, state:
 
 Do not pad the report with generic praise or restate the entire prompt.
 
-## 11. Git behavior
+## 12. Git behavior
 
 Never commit or push unless the user explicitly asks for it.
 

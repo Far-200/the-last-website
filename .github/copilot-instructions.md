@@ -37,6 +37,20 @@ The aesthetic is restrained, ordinary, human, and atmospheric—not generic cybe
 - Meaningful amber warmth first appears after CAPTCHA failure and remains small/local; Memories warmth is human trace, not a cozy orange wash.
 - Do not add OrbitControls, free roam, objectives, minimaps, or generic game UI unless explicitly requested.
 
+
+### Submission art-direction sprint
+
+During the submission art-direction sprint, follow the detailed visual priorities and asset policy in `AGENTS.md`.
+
+For local implementation tasks:
+
+- favor reusable environment components and deterministic authored placement;
+- preserve clear foreground/midground/background depth and useful motion parallax;
+- integrate screens/content into physical structures instead of defaulting to floating UI;
+- prefer silhouette-changing geometry for low-poly damage rather than texture-only decoration;
+- do not independently redesign scene composition, randomly populate environments, add filler to LastMessage, or introduce a new visual/asset system when the task only asks for a small implementation;
+- preserve the existing route, interactions, camera authority, and transition contract unless the task explicitly changes them.
+
 ## Editing rules
 
 Before a non-trivial scene edit, inspect:

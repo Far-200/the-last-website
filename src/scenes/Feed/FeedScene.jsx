@@ -38,6 +38,7 @@ import FeedDebris from "./FeedDebris";
 import FeedParticles from "./FeedParticles";
 import FeedSecondaryFragments from "./FeedSecondaryFragments";
 import FeedArchiveField from "./FeedArchiveField";
+import FeedInfrastructure from "./FeedInfrastructure";
 import FeedArchitecture, { APERTURE_Z, ROUTE_START_Z } from "./FeedArchitecture";
 
 // Must stay identical to `.feed-root`'s background in feed.css.
@@ -240,6 +241,13 @@ export default function FeedScene({
 
       <FeedArchitecture />
       <FeedDebris />
+
+      {/* The ruined information layer built into the nave — rack towers,
+          feed pylons, overhead ducts, cable, conduit, chunky debris and
+          distant tower silhouettes. Static authored geometry only; it
+          composes the depth bands around FeedCamera's route without
+          touching the camera, fog or lights. See FeedInfrastructure. */}
+      <FeedInfrastructure />
 
       {/* Physical archive population, kept separate from both authored
           primary fragments and text-only ghost traces. The secondary layer

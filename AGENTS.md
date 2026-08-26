@@ -75,7 +75,105 @@ Until the current hackathon submission deadline on **2026-09-01 03:30 IST**, tre
 
 After that date, this temporary rule may be removed or revised.
 
-## 5. Scene ownership
+## 5. Submission-sprint art direction
+
+Until the current hackathon submission deadline on **2026-09-01 03:30 IST**, visual work should operate in an explicit art-direction mode on top of the existing architecture and narrative rules.
+
+The goal is not to add more features. The goal is to make the existing experience read as a deliberate, atmospheric 3D world in every important shot.
+
+### Visual priority order
+
+When tradeoffs are required, prefer visible impact in this order:
+
+1. composition and focal hierarchy;
+2. depth, parallax, occlusion, and scale cues;
+3. environmental density appropriate to the scene;
+4. lighting and fog hierarchy;
+5. material response and silhouette quality;
+6. motion/reveal polish;
+7. additional detail.
+
+Do not spend submission-sprint time on architectural elegance, speculative abstraction, or invisible refactors unless they directly unblock one of the priorities above.
+
+### What makes the world feel 3D
+
+Judge 3D quality primarily through:
+
+- foreground geometry passing near or partly across the camera;
+- overlapping silhouettes rather than isolated objects;
+- clear separation between foreground, route/midground, architecture, and distant fog/silhouette layers;
+- authored motion parallax along the existing camera path;
+- objects that extend beyond the frame instead of presenting their full shape politely;
+- overhead geometry such as beams, cables, ducts, bridges, or collapsed structure where appropriate;
+- scale cues that make major structures feel genuinely large.
+
+A strong shot will often use several depth bands, but this is a composition guideline, not permission to clutter every empty region.
+
+### World-integrated objects
+
+Objects should belong to the environment.
+
+- Avoid arbitrary floating monitors, cards, panels, or decorative meshes unless the scene specifically calls for them.
+- Feed content should preferably live on damaged terminals, pylons, walls, billboards, fallen screens, kiosks, or other physical structures.
+- World-space text/signage that is meant to exist physically should participate in depth, fog, occlusion, and tone response where practical instead of behaving like detached DOM UI.
+- Damage should change silhouette when possible; do not rely only on a texture to make a perfect box read as broken.
+
+### Authored density, not random scattering
+
+Prefer authored placement over uncontrolled random population.
+
+- Repetition may be parameterized, but important composition must remain intentional and reproducible.
+- If procedural variation is used, it should be deterministic or seeded.
+- Reuse a small coherent environmental vocabulary aggressively: slabs, pillars, server forms, screen structures, frames, cables, pipes, rails, debris, and related variants.
+- One strong reusable component with controlled variations is preferable to many unrelated one-off meshes.
+
+### Procedural geometry and external assets
+
+Use the cheapest approach that preserves the intended visual read.
+
+- Prefer procedural R3F geometry for architecture, environmental mass, cables, pipes, debris systems, pylons, screen structures, and distant silhouettes.
+- Prefer lightweight external GLB/glTF assets where recognizable object detail materially matters, especially intimate human props in Memories.
+- Do not download an external model merely because modelling something in code is inconvenient.
+- Do not rebuild a detailed recognizable prop from primitive boxes merely to avoid importing an asset.
+- Keep external assets web-appropriate: optimize geometry and textures, avoid unnecessary high-resolution maps, and do not casually increase loading cost for background detail.
+
+### Scene density curve
+
+Density is intentionally different by scene:
+
+- **Prelude:** contained infrastructure and a few strong near/mid/far layers;
+- **Feed:** the densest scene, with layered information infrastructure, debris, overhead structure, and deep silhouettes;
+- **Graveyard:** less cluttered than Feed but more monumental, with large ruined forms and negative space;
+- **Memories:** intimate and human-scaled, using a small number of recognizable props and local light;
+- **LastMessage:** deliberately sparse; absence is the composition and must not be “fixed” with filler.
+
+Do not normalize all five scenes toward the same amount of geometry.
+
+### Preserve the authored spine
+
+When doing visual-density or art-direction work:
+
+- preserve the existing route, scene progression, story objects, interaction contract, and transition unless the user explicitly asks to change them;
+- build composition around the camera path rather than changing the camera path merely to showcase new geometry;
+- do not obstruct required interactions, CTA visibility, CAPTCHA interaction, memory readability, or transition concealment with foreground detail.
+
+### Visual review standard
+
+Visual work is not done because lint/build passes.
+
+When a real render can be inspected, evaluate representative frames for:
+
+- clear focal point;
+- useful foreground/midground/background separation;
+- dead space versus intentional negative space;
+- silhouette overlap;
+- believable scale;
+- lighting hierarchy;
+- fog depth;
+- whether objects feel embedded in a place rather than placed on a floor;
+- whether added density improves the scene's emotional role instead of merely making it busier.
+
+## 6. Scene ownership
 
 `src/App.jsx` is intentionally small.
 
@@ -100,7 +198,7 @@ A scene must call its boundary only after its own authored exit/concealment has 
 
 Do not add manual cross-scene reset machinery without a concrete need. React unmount/remount currently provides a clean reset of scene-local refs, state, and timelines.
 
-## 6. Typical scene architecture
+## 7. Typical scene architecture
 
 Before editing a scene, understand the whole ownership chain rather than editing one visually obvious file in isolation.
 
@@ -119,7 +217,7 @@ Prefer the existing local pattern over forcing every scene into one generic abst
 
 Do not add a generic "engine" layer.
 
-## 7. Continuous motion and animation authority
+## 8. Continuous motion and animation authority
 
 This is one of the most important invariants in the repository.
 
@@ -162,7 +260,7 @@ At a given moment, a render-critical property should have one clear authority.
 
 Do not "fix" an animation by layering a second writer on top of the first.
 
-## 8. Transition contract
+## 9. Transition contract
 
 Scene transitions are authored visual handoffs, not page changes.
 
@@ -181,7 +279,7 @@ Prefer world-space concealment/reveal over a generic full-screen black cut unles
 
 Never add a loading flash, default canvas background flash, or obvious mount/unmount cut between scenes.
 
-## 9. Narrative and visual rules
+## 10. Narrative and visual rules
 
 These are product rules, not optional aesthetic suggestions.
 
@@ -225,7 +323,7 @@ Respect the established emotional color language.
 - Do not globally wash Memories in orange.
 - Do not turn the Graveyard warm cue into a centered beacon or objective marker.
 
-## 10. Scene-specific intent
+## 11. Scene-specific intent
 
 ### Prelude — Uncertainty
 
@@ -269,7 +367,7 @@ Respect the established emotional color language.
 - `[ RECONNECT ]` appears only after the finale reaches its ended state.
 - Audio is currently deferred in implementation. Do not opportunistically add a partial audio system unless the task specifically targets audio.
 
-## 11. Accessibility and reduced motion
+## 12. Accessibility and reduced motion
 
 Accessibility behavior is part of the scene architecture.
 
@@ -293,7 +391,7 @@ It should reduce/suppress unnecessary motion while preserving:
 
 Do not delete visually hidden DOM because it "isn't visible." It may exist specifically for screen readers or keyboard access.
 
-## 12. Performance rules
+## 13. Performance rules
 
 This project renders real-time 3D. Avoid creating React work every frame.
 
@@ -307,7 +405,7 @@ This project renders real-time 3D. Avoid creating React work every frame.
 
 Do not introduce Zustand, a new animation library, a post-processing framework, or an audio package merely because it was once proposed or would make an abstraction "cleaner."
 
-## 13. Code style
+## 14. Code style
 
 - Match the style of the file you are editing.
 - Source JSX currently predominantly uses double quotes; do not mass-format unrelated files.
@@ -318,7 +416,7 @@ Do not introduce Zustand, a new animation library, a post-processing framework, 
 - Reuse established elements in `src/three/elements` when they actually fit.
 - Keep shared coordinates/math in one local source when multiple modules must agree, as existing layout/ground helpers do.
 
-## 14. Workflow for every non-trivial change
+## 15. Workflow for every non-trivial change
 
 Before editing:
 
@@ -350,7 +448,7 @@ After editing:
 
 Do not claim "fixed", "pixel-perfect", "seamless", or "verified" if the relevant render was not actually inspected.
 
-## 15. Git safety
+## 16. Git safety
 
 Unless the user explicitly asks:
 
@@ -363,7 +461,7 @@ Unless the user explicitly asks:
 
 Leave the working tree in a reviewable state and summarize changed files.
 
-## 16. Definition of done
+## 17. Definition of done
 
 A change is done when:
 
@@ -375,4 +473,5 @@ A change is done when:
 - lint passes;
 - build passes;
 - visual claims are backed by actual visual verification where applicable;
+- visual-density/art-direction work was judged in rendered frames for focal hierarchy, depth, scale, silhouette, and scene-appropriate density when rendering was available;
 - no unrelated scope was introduced.
