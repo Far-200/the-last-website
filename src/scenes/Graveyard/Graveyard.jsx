@@ -52,6 +52,19 @@ const LINE_HEIGHT_PX = 16;
 // read as heavier, not faster.
 const PROGRESS_PER_PIXEL = 0.00007;
 
+// Touch-drag input reuses the wheel progression core unchanged (see the
+// input effect below); only the device-to-pixel conversion differs. Raw
+// finger travel in CSS pixels advances progress far more slowly than a
+// wheel notch does, so touch deltas are scaled by this multiplier before
+// being handed to the shared handler. PROGRESS_PER_PIXEL is deliberately
+// left alone so desktop wheel/trackpad pacing is identical to before.
+const TOUCH_PROGRESS_MULTIPLIER = 3;
+// A gesture must travel at least this far vertically before it is treated
+// as a scrub. Under this distance it stays a tap: no preventDefault, no
+// progress change — which is what keeps a tap on the CAPTCHA (a mesh in
+// the canvas) reaching the raycaster instead of being swallowed here.
+const TOUCH_DRAG_THRESHOLD_PX = 6;
+
 // Where the checkbox becomes live. The camera's damping lags progress
 // slightly, so this sits just short of 1 rather than at it — by the time
 // the visitor has pushed progress this far the camera has effectively
@@ -183,10 +196,12 @@ export default function Graveyard({ onVerificationComplete }) {
     const node = rootRef.current;
     if (!node) return undefined;
 
-    const handleWheel = (event) => {
-      // Always prevented, even while locked — otherwise the page itself
-      // would take over the gesture during verification.
-      event.preventDefault();
+    // Shared progression core. Wheel and touch each resolve their own
+    // device input down to a pixel-space delta and hand it here, so the
+    // arrival lock, the verification lock, the stage narration and the
+    // arm threshold live in exactly one place and touch obeys precisely
+    // the same gates as wheel.
+    const applyPixelDelta = (pixelDelta) => {
       // Arrival is not route progress. Input during it is deliberately
       // discarded so the normal route still begins at its authored start.
       if (arrivingRef.current) return;
@@ -195,7 +210,6 @@ export default function Graveyard({ onVerificationComplete }) {
       // would pull the monument out of frame mid-beat.
       if (phaseRef.current !== "idle" && phaseRef.current !== "armed") return;
 
-      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
       const next = Math.min(
         1,
         Math.max(0, progressRef.current + pixelDelta * PROGRESS_PER_PIXEL),
@@ -214,8 +228,78 @@ export default function Graveyard({ onVerificationComplete }) {
       if (next >= ARM_AT && phaseRef.current === "idle") goto("armed");
     };
 
+    const handleWheel = (event) => {
+      // Always prevented, even while locked — otherwise the page itself
+      // would take over the gesture during verification.
+      event.preventDefault();
+
+      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+      applyPixelDelta(pixelDelta);
+    };
+
+    // Vertical touch-drag is the phone equivalent of the wheel. A swipe
+    // UP (finger travels toward a smaller clientY) produces a positive
+    // delta and advances progress, matching a downward wheel notch; a
+    // swipe DOWN produces a negative delta and reverses it wherever
+    // applyPixelDelta already permits reverse movement.
+    let touchStartY = null;
+    let touchLastY = null;
+    let touchDragging = false;
+
+    const handleTouchStart = (event) => {
+      // Single-finger only; a second finger (pinch) cancels the scrub.
+      if (event.touches.length !== 1) {
+        touchStartY = null;
+        touchLastY = null;
+        touchDragging = false;
+        return;
+      }
+      touchStartY = event.touches[0].clientY;
+      touchLastY = touchStartY;
+      touchDragging = false;
+    };
+
+    const handleTouchMove = (event) => {
+      if (touchLastY === null) return;
+      const currentY = event.touches[0].clientY;
+
+      // Until the finger has moved a meaningful vertical distance, leave
+      // the gesture completely alone: no preventDefault, no progress. A
+      // tap on the CAPTCHA checkbox stays under the threshold, so it is
+      // never cancelled here and reaches the canvas raycaster as normal.
+      if (!touchDragging) {
+        if (Math.abs(currentY - touchStartY) < TOUCH_DRAG_THRESHOLD_PX) return;
+        touchDragging = true;
+        touchLastY = currentY;
+        return;
+      }
+
+      // passive:false — this preventDefault is what suppresses page
+      // scroll / rubber-banding for the drag itself.
+      event.preventDefault();
+      const deltaY = touchLastY - currentY;
+      touchLastY = currentY;
+      applyPixelDelta(deltaY * TOUCH_PROGRESS_MULTIPLIER);
+    };
+
+    const handleTouchEnd = () => {
+      touchStartY = null;
+      touchLastY = null;
+      touchDragging = false;
+    };
+
     node.addEventListener("wheel", handleWheel, { passive: false });
-    return () => node.removeEventListener("wheel", handleWheel);
+    node.addEventListener("touchstart", handleTouchStart, { passive: true });
+    node.addEventListener("touchmove", handleTouchMove, { passive: false });
+    node.addEventListener("touchend", handleTouchEnd, { passive: true });
+    node.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    return () => {
+      node.removeEventListener("wheel", handleWheel);
+      node.removeEventListener("touchstart", handleTouchStart);
+      node.removeEventListener("touchmove", handleTouchMove);
+      node.removeEventListener("touchend", handleTouchEnd);
+      node.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, [goto]);
 
   return (

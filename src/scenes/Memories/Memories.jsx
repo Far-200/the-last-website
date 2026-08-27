@@ -68,6 +68,18 @@ const LINE_HEIGHT_PX = 16;
 // looking at something, not about covering ground.
 const PROGRESS_PER_PIXEL = 0.00016;
 
+// Touch-drag input reuses the wheel progression core unchanged (see the
+// input effect below); only the device-to-pixel conversion differs. Raw
+// finger travel in CSS pixels advances progress far more slowly than a
+// wheel notch does, so touch deltas are scaled by this multiplier before
+// being handed to the shared handler. PROGRESS_PER_PIXEL is deliberately
+// left alone so desktop wheel/trackpad pacing is identical to before.
+const TOUCH_PROGRESS_MULTIPLIER = 3;
+// A gesture must travel at least this far vertically before it is treated
+// as a scrub. Under this distance it stays a tap: no preventDefault, no
+// progress change — so a plain tap does nothing.
+const TOUCH_DRAG_THRESHOLD_PX = 6;
+
 // One narration stage per camera stop (see MemoriesCamera's STOPS),
 // mirroring the Graveyard's own STAGE_AT/NARRATION split — carried non-
 // visually since the visual recognition here is a camera move and an
@@ -162,14 +174,16 @@ export default function Memories({ onMemoriesComplete }) {
     const node = rootRef.current;
     if (!node) return undefined;
 
-    const handleWheel = (event) => {
-      event.preventDefault();
+    // Shared progression core. Wheel and touch each resolve their own
+    // device input down to a pixel-space delta and hand it here, so the
+    // ending gate, the stage narration and the extinction trigger live in
+    // exactly one place and touch obeys precisely the same gates as wheel.
+    const applyPixelDelta = (pixelDelta) => {
       // Progression stops the instant the ending begins, exactly like
       // Feed's own threshold: nothing should be able to keep nudging the
       // already-settled final camera position while the room is fading.
       if (endingRef.current) return;
 
-      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
       const next = Math.min(
         1,
         Math.max(0, progressRef.current + pixelDelta * PROGRESS_PER_PIXEL),
@@ -191,8 +205,75 @@ export default function Memories({ onMemoriesComplete }) {
       }
     };
 
+    const handleWheel = (event) => {
+      event.preventDefault();
+
+      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+      applyPixelDelta(pixelDelta);
+    };
+
+    // Vertical touch-drag is the phone equivalent of the wheel. A swipe
+    // UP (finger travels toward a smaller clientY) produces a positive
+    // delta and advances progress, matching a downward wheel notch; a
+    // swipe DOWN produces a negative delta and reverses it wherever
+    // applyPixelDelta already permits reverse movement.
+    let touchStartY = null;
+    let touchLastY = null;
+    let touchDragging = false;
+
+    const handleTouchStart = (event) => {
+      // Single-finger only; a second finger (pinch) cancels the scrub.
+      if (event.touches.length !== 1) {
+        touchStartY = null;
+        touchLastY = null;
+        touchDragging = false;
+        return;
+      }
+      touchStartY = event.touches[0].clientY;
+      touchLastY = touchStartY;
+      touchDragging = false;
+    };
+
+    const handleTouchMove = (event) => {
+      if (touchLastY === null) return;
+      const currentY = event.touches[0].clientY;
+
+      // Until the finger has moved a meaningful vertical distance, leave
+      // the gesture completely alone: no preventDefault, no progress —
+      // which is what makes a plain tap a no-op.
+      if (!touchDragging) {
+        if (Math.abs(currentY - touchStartY) < TOUCH_DRAG_THRESHOLD_PX) return;
+        touchDragging = true;
+        touchLastY = currentY;
+        return;
+      }
+
+      // passive:false — this preventDefault is what suppresses page
+      // scroll / rubber-banding for the drag itself.
+      event.preventDefault();
+      const deltaY = touchLastY - currentY;
+      touchLastY = currentY;
+      applyPixelDelta(deltaY * TOUCH_PROGRESS_MULTIPLIER);
+    };
+
+    const handleTouchEnd = () => {
+      touchStartY = null;
+      touchLastY = null;
+      touchDragging = false;
+    };
+
     node.addEventListener("wheel", handleWheel, { passive: false });
-    return () => node.removeEventListener("wheel", handleWheel);
+    node.addEventListener("touchstart", handleTouchStart, { passive: true });
+    node.addEventListener("touchmove", handleTouchMove, { passive: false });
+    node.addEventListener("touchend", handleTouchEnd, { passive: true });
+    node.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    return () => {
+      node.removeEventListener("wheel", handleWheel);
+      node.removeEventListener("touchstart", handleTouchStart);
+      node.removeEventListener("touchmove", handleTouchMove);
+      node.removeEventListener("touchend", handleTouchEnd);
+      node.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, [beginExtinction]);
 
   return (

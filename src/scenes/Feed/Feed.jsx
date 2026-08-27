@@ -84,6 +84,19 @@ const LINE_HEIGHT_PX = 16;
 // faster through it.
 const PROGRESS_PER_PIXEL = 0.00012;
 
+// Touch-drag input reuses the wheel progression core unchanged (see the
+// input effect below); only the device-to-pixel conversion differs. Raw
+// finger travel in CSS pixels advances progress far more slowly than a
+// wheel notch does, so touch deltas are scaled by this multiplier before
+// being handed to the shared handler. PROGRESS_PER_PIXEL is deliberately
+// left alone so desktop wheel/trackpad pacing is identical to before.
+const TOUCH_PROGRESS_MULTIPLIER = 3;
+// A gesture must travel at least this far vertically before it is treated
+// as a scrub. Under this distance it stays a tap: no preventDefault, no
+// progress change — so a plain tap does nothing and taps that land on
+// DOM controls or the canvas are never swallowed.
+const TOUCH_DRAG_THRESHOLD_PX = 6;
+
 // Arrival duration. Deliberately shorter than Prelude's own 1.5s dolly —
 // this is the tail end of one continuous move, not a second act, and by
 // the time it starts most of the perceived "distance" has already been
@@ -171,20 +184,16 @@ export default function Feed({ onThresholdCrossed }) {
     const node = rootRef.current;
     if (!node) return undefined;
 
-    // Non-passive so this genuinely owns the gesture rather than letting
-    // the browser also interpret it (html/body already have
-    // overflow:hidden globally, so this is belt-and-suspenders against
-    // scroll-chaining/rubber-banding, not the only thing preventing it).
-    const handleWheel = (event) => {
-      // Always prevented, even while arriving or crossing — otherwise the
-      // page itself would take over the gesture during either.
-      event.preventDefault();
+    // Shared progression core. Wheel and touch each resolve their own
+    // device input down to a pixel-space delta and hand it here, so the
+    // arrival/leaving gate and the threshold trigger live in exactly one
+    // place and touch obeys precisely the same gates as wheel.
+    const applyPixelDelta = (pixelDelta) => {
       // No buffering: input during arrival is discarded outright rather
       // than queued, so nothing accumulated jumps the camera forward the
       // instant arrival ends.
       if (arrivingRef.current || leavingRef.current) return;
 
-      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
       const next = Math.min(1, Math.max(0, progressRef.current + pixelDelta * PROGRESS_PER_PIXEL));
       progressRef.current = next;
 
@@ -193,8 +202,82 @@ export default function Feed({ onThresholdCrossed }) {
       }
     };
 
+    // Non-passive so this genuinely owns the gesture rather than letting
+    // the browser also interpret it (html/body already have
+    // overflow:hidden globally, so this is belt-and-suspenders against
+    // scroll-chaining/rubber-banding, not the only thing preventing it).
+    const handleWheel = (event) => {
+      // Always prevented, even while arriving or crossing — otherwise the
+      // page itself would take over the gesture during either.
+      event.preventDefault();
+
+      const pixelDelta = event.deltaMode === 1 ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+      applyPixelDelta(pixelDelta);
+    };
+
+    // Vertical touch-drag is the phone equivalent of the wheel. A swipe
+    // UP (finger travels toward a smaller clientY) produces a positive
+    // delta and advances progress, matching a downward wheel notch; a
+    // swipe DOWN produces a negative delta and reverses it wherever
+    // applyPixelDelta already permits reverse movement.
+    let touchStartY = null;
+    let touchLastY = null;
+    let touchDragging = false;
+
+    const handleTouchStart = (event) => {
+      // Single-finger only; a second finger (pinch) cancels the scrub.
+      if (event.touches.length !== 1) {
+        touchStartY = null;
+        touchLastY = null;
+        touchDragging = false;
+        return;
+      }
+      touchStartY = event.touches[0].clientY;
+      touchLastY = touchStartY;
+      touchDragging = false;
+    };
+
+    const handleTouchMove = (event) => {
+      if (touchLastY === null) return;
+      const currentY = event.touches[0].clientY;
+
+      // Until the finger has moved a meaningful vertical distance, leave
+      // the gesture untouched: no preventDefault, no progress. This is
+      // what makes a tap a no-op and keeps taps on DOM/canvas controls
+      // working on touch devices.
+      if (!touchDragging) {
+        if (Math.abs(currentY - touchStartY) < TOUCH_DRAG_THRESHOLD_PX) return;
+        touchDragging = true;
+        touchLastY = currentY;
+        return;
+      }
+
+      // passive:false — this preventDefault is what suppresses page
+      // scroll / rubber-banding for the drag itself.
+      event.preventDefault();
+      const deltaY = touchLastY - currentY;
+      touchLastY = currentY;
+      applyPixelDelta(deltaY * TOUCH_PROGRESS_MULTIPLIER);
+    };
+
+    const handleTouchEnd = () => {
+      touchStartY = null;
+      touchLastY = null;
+      touchDragging = false;
+    };
+
     node.addEventListener("wheel", handleWheel, { passive: false });
-    return () => node.removeEventListener("wheel", handleWheel);
+    node.addEventListener("touchstart", handleTouchStart, { passive: true });
+    node.addEventListener("touchmove", handleTouchMove, { passive: false });
+    node.addEventListener("touchend", handleTouchEnd, { passive: true });
+    node.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    return () => {
+      node.removeEventListener("wheel", handleWheel);
+      node.removeEventListener("touchstart", handleTouchStart);
+      node.removeEventListener("touchmove", handleTouchMove);
+      node.removeEventListener("touchend", handleTouchEnd);
+      node.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, [beginLeaving]);
 
   return (
