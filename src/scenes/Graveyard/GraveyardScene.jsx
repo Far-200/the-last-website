@@ -40,6 +40,7 @@ import GraveyardCamera from "./GraveyardCamera";
 import GraveyardArchitecture, { EYE_HEIGHT, HORIZON } from "./GraveyardArchitecture";
 import GraveyardRelics from "./GraveyardRelics";
 import GraveyardMemorials from "./GraveyardMemorials";
+import GraveMarkerField from "./GraveMarkerField";
 import GraveyardCaptcha from "./GraveyardCaptcha";
 import { groundHeightAt } from "./groundHeight";
 
@@ -193,6 +194,11 @@ export default function GraveyardScene({
       <GraveyardArchitecture arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
       <GraveyardRelics />
       <GraveyardMemorials />
+      {/* Authored Blender kit — visual test population in one stretch of
+          the route (see GraveMarkerField.jsx). Static like the towers and
+          relics: it takes no arrival prop and reveals with the scene's
+          own fog/light ramp. */}
+      <GraveMarkerField />
       <GraveyardCaptcha
         progressRef={progressRef}
         reduceMotion={reduceMotion}
