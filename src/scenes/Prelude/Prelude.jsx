@@ -31,6 +31,8 @@ import "./prelude.css";
 // narrative understandable" holds for keyboard/screen-reader visitors too,
 // not only for prefers-reduced-motion.
 const PHASE_NARRATION = {
+  awakening:
+    "Waking in darkness. A collapsed room resolves: wreckage nearby, a broken ceiling above, and one damaged console that still has power.",
   signal: "A dead network signal. A connect control is available.",
   resolving: "Connecting. One fragment resolves: \"...GONE.\"",
   system:
@@ -58,10 +60,22 @@ function usePrefersReducedMotion() {
 }
 
 export default function Prelude({ onConnected }) {
-  const [phase, setPhase] = useState("signal");
+  const [phase, setPhase] = useState("awakening");
   const [systemRevealStep, setSystemRevealStep] = useState(0);
   const reduceMotion = usePrefersReducedMotion();
   const timelineRef = useRef(null);
+  const awakeningTlRef = useRef(null);
+  const lidTopRef = useRef(null);
+  const lidBottomRef = useRef(null);
+  const canvasLayerRef = useRef(null);
+  // Drives the awakening rise, fog opening and console lead-in inside
+  // PreludeScene — see AwakeningDolly there. Same split as
+  // leavingProgressRef below: GSAP writes a plain ref every tick, one
+  // useFrame reads it, and React never re-renders for it.
+  const awakeningProgressRef = useRef(0);
+  // The machine's own state: 0 dead, ~0.22 standby, 1 awake. GSAP flickers
+  // this at the moment of contact and PreludeScene's lights read it.
+  const consoleWakeRef = useRef(0);
   // Drives the leaving-phase forward dolly, fog tightening and light
   // dimming in PreludeScene — see LeavingDolly there. A ref, not state,
   // for the same reason progressRef is a ref throughout the project:
@@ -74,6 +88,154 @@ export default function Prelude({ onConnected }) {
       timelineRef.current?.kill();
     };
   }, []);
+
+  // --- AWAKENING ------------------------------------------------------
+  // The opening beat: a human consciousness coming to on the floor of the
+  // room, finding the one machine in it that still has power, and rising
+  // toward it. It is a PHASE of this component, not a separate scene, and
+  // that is the whole reason the handoff into SIGNAL costs nothing —
+  // there is no second Canvas, no second WebGL context, no mount swap to
+  // conceal. AwakeningDolly simply stops writing and CameraResponse picks
+  // up at a pose it is already at (the last AWAKENING_KEYS entry is
+  // CAMERA_BY_PHASE.signal exactly).
+  //
+  // GSAP owns the discrete beats — eyelid travel, the blink, the focus
+  // hunt — as direct DOM tweens, and separately ramps the plain
+  // awakeningProgressRef the render loop reads for the camera. That is the
+  // project's standing split, not a new mechanism.
+  //
+  // The eyelids are DOM, deliberately. They are the cheapest honest
+  // first-person device available: no hands, no body, no character, no
+  // FPS controller — just the frame closing and opening the way an eye
+  // does, with a curved inner edge so it never reads as a letterbox.
+  useEffect(() => {
+    const top = lidTopRef.current;
+    const bottom = lidBottomRef.current;
+    const canvasLayer = canvasLayerRef.current;
+    if (!top || !bottom || !canvasLayer) return undefined;
+
+    const focus = { blur: reduceMotion ? 7 : 13 };
+    const applyBlur = () => {
+      canvasLayer.style.filter = focus.blur < 0.08 ? "" : `blur(${focus.blur.toFixed(2)}px)`;
+    };
+    applyBlur();
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        canvasLayer.style.filter = "";
+        canvasLayer.style.willChange = "";
+        setPhase("signal");
+      },
+    });
+    awakeningTlRef.current = tl;
+
+    // Reduced motion keeps ALL SIX BEATS — darkness, waking (including
+    // the eyes failing once, which is a lid translate and carries no
+    // vestibular load), orientation, discovery, the reach, and the
+    // machine answering. What it drops is only what moves the whole
+    // field of view: the camera never moves at all (see AwakeningDolly's
+    // own reduceMotion branch), there is no blink, and focus settles once
+    // instead of hunting. It runs at roughly half length and is a
+    // shorter version of the same scene, not a fallback. It wakes close
+    // to the CRT and keeps only a restrained orientation and short settle.
+    if (reduceMotion) {
+      tl.to(awakeningProgressRef, { current: 1, duration: 3.8, ease: "none" }, 0);
+      // Waking, including the eyes failing once — a lid translate, no
+      // vestibular load, and the most human thing in the sequence.
+      tl.to([top, bottom], { scaleY: 0.8, duration: 0.7, ease: "power1.inOut" }, 0.5);
+      tl.to([top, bottom], { scaleY: 0.92, duration: 0.32, ease: "power2.in" }, 1.55);
+      tl.to([top, bottom], { scaleY: 0.07, duration: 1.3, ease: "power2.out" }, 2.1);
+      tl.to(focus, { blur: 0, duration: 1.5, ease: "power2.out", onUpdate: applyBlur }, 2.1);
+      // Discovery, then the same call-and-response as full motion: the
+      // machine stirs, nothing happens for a beat, then it catches.
+      tl.to(consoleWakeRef, { current: 0.24, duration: 0.18, ease: "none" }, 4.35);
+      tl.to(consoleWakeRef, { current: 0.08, duration: 0.2, ease: "power1.out" }, 4.55);
+      tl.to(consoleWakeRef, { current: 0.95, duration: 0.09, ease: "none" }, 5.05);
+      tl.to(consoleWakeRef, { current: 0.2, duration: 0.08, ease: "none" }, 5.16);
+      tl.to(consoleWakeRef, { current: 1, duration: 0.7, ease: "power2.out" }, 5.26);
+      tl.to({}, { duration: 0.45 }, 6.05);
+      return () => {
+        tl.kill();
+        canvasLayer.style.filter = "";
+      };
+    }
+
+    canvasLayer.style.willChange = "filter";
+
+    // Absolute positions rather than a sequential chain, so the six beats
+    // and the silences between them are readable as a score. The previous
+    // version chained everything back to back, and back-to-back is
+    // exactly what made it feel mechanical: there was never a moment
+    // where nothing was happening.
+    // `open` is how far the eyes are open, 0 shut to 100 wide. Driven as
+    // a scale toward each lid's own anchored edge rather than a
+    // translate — see the note on .prelude-lid--top in prelude.css for
+    // why a translate here scrolled the entire scene.
+    const lids = (open, duration, ease, at) =>
+      tl.to([top, bottom], { scaleY: 1 - open / 100, duration, ease }, at);
+    const blurTo = (blur, duration, ease, at) =>
+      tl.to(focus, { blur, duration, ease, onUpdate: applyBlur }, at);
+
+    // 1 — DARKNESS. Longer than feels necessary, which is the point.
+    // 2 — WAKING. The eyes crack open, fail, and close again before they
+    //     manage it. That failure is the single most human thing in the
+    //     sequence: consciousness does not arrive on a curve.
+    lids(18, 1.0, "power1.inOut", 1.45);
+    blurTo(11, 1.0, "none", 1.45);
+    lids(7, 0.45, "power2.in", 2.95); // it doesn't hold — eyes fall shut
+    blurTo(12.5, 0.45, "none", 2.95);
+
+    // A second, successful attempt, slower and further.
+    lids(46, 1.35, "power1.inOut", 4.35);
+    blurTo(7.4, 1.5, "none", 4.35);
+
+    // 3 — ORIENTATION. A blink, then all the way open, then focus hunts:
+    //     sharp, soft again, sharp. An eye finding focus overshoots.
+    lids(13, 0.14, "power2.in", 6.25);
+    blurTo(9.5, 0.14, "none", 6.25);
+    lids(64, 0.24, "power2.out", 6.39);
+    lids(93, 1.7, "power2.out", 6.8);
+    blurTo(1.5, 0.95, "power2.out", 6.8);
+    blurTo(3.4, 0.55, "sine.inOut", 7.85);
+    blurTo(0, 1.15, "power2.out", 8.4);
+
+    // 4 — DISCOVERY. The machine comes up out of dead into a standby
+    //     glow — noticeable, not readable — while the camera is still
+    //     rising toward it.
+    // 5 — ACCESS. The camera has just arrived at the lean (see the 0.76
+    //     keyframe) and now holds. The machine STIRS — barely, once — as
+    //     though it registered something, and then falls back. Nothing
+    //     happens for most of a second after that.
+    //
+    //     That silence is the beat. It is the visitor deciding, and it is
+    //     what an intentional act looks like when the actor is never
+    //     shown: approach, a flicker of acknowledgement, a pause, and
+    //     then commitment. The response below is an ANSWER to it.
+    tl.to(consoleWakeRef, { current: 0.38, duration: 0.15, ease: "none" }, 14.9);
+    tl.to(consoleWakeRef, { current: 0.08, duration: 0.24, ease: "power1.out" }, 15.07);
+
+    // 6 — RESPONSE. Not a fade-up — a dead panel finding power, losing
+    //     it, finding it again, and holding. Under half a second of
+    //     flicker, and it is the emotional hinge of the whole opening.
+    tl.to(consoleWakeRef, { current: 0.95, duration: 0.07, ease: "none" }, 15.55);
+    tl.to(consoleWakeRef, { current: 0.12, duration: 0.06, ease: "none" }, 15.64);
+    tl.to(consoleWakeRef, { current: 1, duration: 0.09, ease: "none" }, 15.72);
+    tl.to(consoleWakeRef, { current: 0.38, duration: 0.08, ease: "none" }, 15.83);
+    tl.to(consoleWakeRef, { current: 1, duration: 0.7, ease: "power2.out" }, 15.93);
+
+    // The camera is already stopped on the physical screen normal before
+    // the wake begins. After the stable catch the phase flips and output
+    // arrives afterwards, in
+    // stages, in CSS — see prelude.css.
+    tl.to(awakeningProgressRef, { current: 1, duration: 14.2, ease: "none" }, 0);
+    tl.to({}, { duration: 0.5 }, 16.65);
+
+    return () => {
+      tl.kill();
+      canvasLayer.style.filter = "";
+      canvasLayer.style.willChange = "";
+    };
+  }, [reduceMotion]);
 
   // The resolving -> system -> archive sequence, authored as a single
   // GSAP timeline of state-setter calls. Durations follow the pacing
@@ -150,18 +312,20 @@ export default function Prelude({ onConnected }) {
     timelineRef.current = tl;
     tl.to(leavingProgressRef, {
       current: 1,
-      duration: reduceMotion ? 0.4 : 1.5,
-      ease: reduceMotion ? "power1.out" : "power1.inOut",
+      duration: reduceMotion ? 0.65 : 2.6,
+      ease: "none",
     });
   }, [phase, onConnected, reduceMotion]);
 
   return (
     <div className="prelude-root" data-phase={phase}>
-      <div className="prelude-canvas-layer">
+      <div className="prelude-canvas-layer" ref={canvasLayerRef}>
         <PreludeScene
           reduceMotion={reduceMotion}
           phase={phase}
           leavingProgressRef={leavingProgressRef}
+          awakeningProgressRef={awakeningProgressRef}
+          consoleWakeRef={consoleWakeRef}
         />
       </div>
 
@@ -169,6 +333,14 @@ export default function Prelude({ onConnected }) {
       <div className="prelude-scanlines" aria-hidden="true" />
       <div className="prelude-grain" aria-hidden="true" />
       <div className="prelude-vignette" aria-hidden="true" />
+
+      {/* The visitor's own eyelids. Above every other layer, including the
+          depth frames, so nothing can render on top of a closed eye. They
+          never fully retract — a few percent stays at each edge for the
+          rest of the scene, which keeps the first-person read alive and
+          doubles as a softer frame than the vignette alone. */}
+      <div ref={lidTopRef} className="prelude-lid prelude-lid--top" aria-hidden="true" />
+      <div ref={lidBottomRef} className="prelude-lid prelude-lid--bottom" aria-hidden="true" />
 
       <PreludeHUD phase={phase} />
 

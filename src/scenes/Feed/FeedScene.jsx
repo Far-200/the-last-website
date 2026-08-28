@@ -141,23 +141,31 @@ function Atmosphere({
       {/* Indirect, sourceless base. The sky term is what lifts the floor
           plane into visibility; the ground term keeps the vault
           undersides dark without crushing them to black. */}
-      <hemisphereLight ref={hemiRef} args={["#36474b", "#1a2120", 12]} />
+      <hemisphereLight
+        ref={hemiRef}
+        args={["#36474b", "#1a2120", arrival ? 12 * ARRIVAL_DIM_FLOOR : 12]}
+      />
 
-      <fog ref={fogRef} attach="fog" args={[HAZE, 16, 170]} />
+      <fog ref={fogRef} attach="fog" args={[HAZE, ...(arrival ? ARRIVAL_FOG : [16, 170])]} />
 
       <directionalLight
         ref={keyRef}
         position={[0, 26, APERTURE_Z + 10]}
-        intensity={9}
+        intensity={arrival ? 9 * ARRIVAL_DIM_FLOOR : 9}
         color="#8b9a92"
       />
 
-      <directionalLight ref={fillRef} position={[7, 14, 34]} intensity={10} color="#42565c" />
+      <directionalLight
+        ref={fillRef}
+        position={[7, 14, 34]}
+        intensity={arrival ? 10 * ARRIVAL_DIM_FLOOR : 10}
+        color="#42565c"
+      />
 
       <pointLight
         ref={apertureRef}
         position={[0, 10, APERTURE_Z + 6]}
-        intensity={1900}
+        intensity={arrival ? 1900 * ARRIVAL_DIM_FLOOR : 1900}
         color="#8fa096"
         distance={150}
         decay={2}

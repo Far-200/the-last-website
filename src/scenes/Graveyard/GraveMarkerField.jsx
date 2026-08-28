@@ -103,25 +103,6 @@ const STONE_FRACTURE = "#69726f";
 // this for the shards, which sit deeper.
 const DEFAULT_SINK = 0.06;
 
-// ─────────────────────────────────────────────────────────────────────
-// TEMPORARY — GLB VISUAL-ISOLATION PASS. NOT a production change.
-//
-// Flip to `false` (single edit) to fully restore normal rendering. While
-// `true`:
-//   * GraveyardMemorials hides ONLY its anonymous FillerGraves field.
-//     Hero memorials and every narrative structure (towers, relics,
-//     racks, 404 slab, CAPTCHA, warm cue) stay exactly as they are.
-//   * This component ADDITIONALLY renders DEBUG_INSPECTION_MARKERS — a
-//     near/midground line-up of all six kit meshes along the opening
-//     stretch of the route, so each authored Blender silhouette can be
-//     read directly in the live scene.
-//
-// The authored MARKERS array below is untouched by this flag. Nothing
-// here changes camera, fog, lighting, progression, the phase machine,
-// the CAPTCHA or any transition. Revert = set this to `false` and remove
-// the matching import in GraveyardMemorials.jsx.
-export const DEBUG_ISOLATE_GLB_MARKERS = true;
-
 // Kept out of the render path: resolves the six named source objects to
 // flat lists of { geometry, material } parts, cloning each GLB material
 // exactly once and recolouring it. Five of the six meshes carry two
@@ -201,26 +182,6 @@ const MARKERS = [
   { id: "h-2", type: "GEO_Grave_Hero_A", pos: [-33, -197], rotY: 1.4, scale: 0.95, lean: [0.02, 0.05] },
 ];
 
-// TEMPORARY (see DEBUG_ISOLATE_GLB_MARKERS above). A single receding row
-// on the open right side of the OPENING stretch of the route — where the
-// camera moves slowly and passes close — so every kit silhouette can be
-// inspected: all six meshes, no scale variation, no lean, distinct Y
-// rotations to present each shape at a useful angle. Cleared for
-// clearance against the early hero memorials (planking / vine /
-// harlemshake), the two foreground relics, the standing tower and the
-// first server rack. This is inspection scaffolding, NOT production
-// placement — do not fold these into MARKERS.
-const DEBUG_INSPECTION_MARKERS = [
-  { id: "dbg-slabA", type: "GEO_Grave_Slab_A", pos: [-20, -34], rotY: 0.35, scale: 1.0 },
-  { id: "dbg-blockB", type: "GEO_Grave_Block_A", pos: [-27, -41], rotY: -1.6, scale: 1.0 },
-  { id: "dbg-slabB", type: "GEO_Grave_Slab_B", pos: [-25, -48], rotY: -0.5, scale: 1.0 },
-  { id: "dbg-block", type: "GEO_Grave_Block_A", pos: [-18, -56], rotY: 0.8, scale: 1.0 },
-  { id: "dbg-frag", type: "GEO_Grave_Fragment_A", pos: [-25, -64], rotY: 1.4, scale: 1.0 },
-  { id: "dbg-thin", type: "GEO_Grave_Thin_A", pos: [-16, -72], rotY: -0.9, scale: 1.0 },
-  { id: "dbg-hero", type: "GEO_Grave_Hero_A", pos: [-22, -86], rotY: 2.1, scale: 1.0 },
-  { id: "dbg-slabA2", type: "GEO_Grave_Slab_A", pos: [-17, -98], rotY: 0.5, scale: 1.0 },
-];
-
 function GraveMarker({ marker, parts }) {
   const pieces = parts[marker.type];
   const [x, z] = marker.pos;
@@ -244,11 +205,6 @@ function GraveMarkerFieldContent() {
       {MARKERS.map((marker) => (
         <GraveMarker key={marker.id} marker={marker} parts={parts} />
       ))}
-      {/* TEMPORARY inspection line-up — see DEBUG_ISOLATE_GLB_MARKERS. */}
-      {DEBUG_ISOLATE_GLB_MARKERS &&
-        DEBUG_INSPECTION_MARKERS.map((marker) => (
-          <GraveMarker key={marker.id} marker={marker} parts={parts} />
-        ))}
     </group>
   );
 }

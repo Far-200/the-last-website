@@ -76,12 +76,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { groundHeightAt, routeXAt } from "./groundHeight";
 import { heroMemorials } from "../../data/graveyardRelics";
-// TEMPORARY — GLB visual-isolation pass. While this flag is true the
-// anonymous FillerGraves field below is hidden so the authored Blender
-// kit can be inspected in isolation. Hero memorials stay. Revert by
-// setting DEBUG_ISOLATE_GLB_MARKERS back to false in GraveMarkerField.jsx
-// and deleting this import + the guard in GraveyardMemorials() below.
-import { DEBUG_ISOLATE_GLB_MARKERS } from "./GraveMarkerField";
 
 // Deliberately LIGHTER than the ground's own albedo (GROUND_STONE,
 // #343b3e in GraveyardArchitecture.jsx) rather than reusing the relics'
@@ -868,10 +862,7 @@ function FillerGraves() {
 export default function GraveyardMemorials() {
   return (
     <group>
-      {/* TEMPORARY: FillerGraves (the anonymous instanced field only) is
-          hidden during the GLB visual-isolation pass. Restore by setting
-          DEBUG_ISOLATE_GLB_MARKERS to false in GraveMarkerField.jsx. */}
-      {!DEBUG_ISOLATE_GLB_MARKERS && <FillerGraves />}
+      <FillerGraves />
       <HeroMemorials />
     </group>
   );

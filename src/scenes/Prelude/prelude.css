@@ -47,7 +47,17 @@
   position: relative;
   width: 100%;
   height: 100%;
+  /* `clip` rather than `hidden`, with hidden kept first as the fallback.
+     An overflow:hidden box whose children stick out of it is still a
+     SCROLL CONTAINER — it just has no visible scrollbar — so anything
+     calling scrollIntoView on a descendant scrolls the whole scene. The
+     grain layer sits at inset:-10% by design, so this box always
+     overflows, and focus moving to the CTA was enough to shove the
+     composition 80px up the viewport. `overflow: clip` clips without
+     creating a scroll container at all, which removes the entire class
+     of bug rather than the one instance of it. */
   overflow: hidden;
+  overflow: clip;
   font-family: var(--font-system);
   color: var(--ink-dim);
   user-select: none;
@@ -87,6 +97,90 @@
   pointer-events: none;
 }
 
+/* --- Eyelids ---
+   The awakening's first-person device (see the awakening timeline in
+   Prelude.jsx). Two panels that meet over the frame and part like eyes
+   rather than like a letterbox — the curved inner edge is what makes that
+   difference, and it is the whole reason these are not just two bars.
+
+   Each is 56% tall so the pair overlaps when closed at yPercent 0, and
+   they open to -93 / +93, leaving a few percent at each edge for the rest
+   of the scene. z-index 16 puts them above the depth frames (12/14) and
+   the HUD (10): nothing may ever draw on top of a closed eye. */
+.prelude-lid {
+  position: absolute;
+  left: -5%;
+  width: 110%;
+  height: 56%;
+  z-index: 16;
+  pointer-events: none;
+  background: #000;
+}
+
+/* Opened by scaling toward the anchored edge, NOT by translating.
+   A translate moves the panel outside .prelude-root, and an
+   overflow:hidden box with content sticking out of it is still
+   programmatically scrollable — so anything that called scrollIntoView
+   (Playwright's own click does, and so does a browser moving focus to the
+   CTA) scrolled the whole scene up by the amount the lid overhung. That
+   showed up as the SYSTEM frame rendering with its copy jammed against
+   the top of the viewport and a black band across the bottom. A scale
+   toward the element's own edge cannot leave its box, so it cannot
+   create the overflow in the first place. */
+.prelude-lid--top {
+  top: 0;
+  transform-origin: 50% 0%;
+  border-radius: 0 0 50% 50% / 0 0 26% 26%;
+  box-shadow: 0 1px 0 rgba(140, 160, 160, 0.06);
+}
+
+.prelude-lid--bottom {
+  bottom: 0;
+  transform-origin: 50% 100%;
+  border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+  box-shadow: 0 -1px 0 rgba(140, 160, 160, 0.05);
+}
+
+/* --- The machine booting ---
+   Nothing that belongs to the console's presence exists while the eyes
+   are still opening: the perimeter HUD, the screen's scanline texture and
+   its floor glow are all things the MACHINE produces, and it has not been
+   woken yet. Grain is deliberately NOT gated — it reads as the grain of
+   vision itself, which is exactly right during the awakening.
+
+   They then arrive in STAGES rather than together. Review's note was that
+   the interface appeared the instant vision cleared, which made it read
+   as a page loading over a render. Staggering the arrival — the screen
+   catches, then its glow reaches the floor, then the machine names
+   itself, then it starts printing — is what turns the same elements into
+   machine output. The delays here are the boot sequence. */
+.prelude-scanlines {
+  opacity: 0;
+  transition: opacity 1.05s ease 0.2s;
+}
+
+.prelude-floor-glow {
+  opacity: 0;
+  transition: opacity 1.5s ease 0.35s;
+}
+
+.prelude-hud {
+  opacity: 0;
+  transition: opacity 1s ease 1.15s;
+}
+
+.prelude-root:not([data-phase="awakening"]) .prelude-scanlines {
+  opacity: 0.5;
+}
+
+.prelude-root:not([data-phase="awakening"]) .prelude-floor-glow {
+  opacity: 1;
+}
+
+.prelude-root:not([data-phase="awakening"]) .prelude-hud {
+  opacity: 0.72;
+}
+
 .prelude-canvas-layer canvas {
   display: block;
   pointer-events: none;
@@ -111,7 +205,9 @@
     transparent 3px
   );
   mix-blend-mode: overlay;
-  opacity: 0.5;
+  /* Resting opacity lives in the boot-staging block above, which gates it
+     on the phase. Restating it here would out-order that rule and leak
+     the machine's own texture into the awakening. */
 }
 
 .prelude-grain {
@@ -194,7 +290,10 @@
   font-family: var(--font-system);
   font-size: 10px;
   letter-spacing: 0.05em;
-  opacity: 0.72;
+  /* Resting opacity lives in the boot-staging block above — see the note
+     on .prelude-scanlines. Restating 0.72 here beat that rule on source
+     order and put the machine's own perimeter readout on screen while the
+     visitor was still lying on the floor with their eyes shut. */
 }
 
 .hud-top-left {
@@ -323,33 +422,63 @@
 
 /* --- Shared restrained CTA base, used by all three depth frames --- */
 
+/* The boxed 1px rectangle this used to be was the single most webpage-like
+   element in the Prelude: a bordered button, centred, with a hover border
+   colour. The copy already carries its own brackets — [ CONNECT TO SIGNAL ]
+   — so the box was drawing a second, redundant, and much more generic
+   affordance around an affordance that already existed.
+
+   It is now bracket-only, with a faint cyan cast and a slow breath tied to
+   nothing but itself: a control the machine is offering, not a control the
+   page is offering. Behaviour is untouched — same element, same handler,
+   same disabled semantics, same 44px minimum target, and a focus ring that
+   is now MORE visible than before rather than less, since it no longer has
+   to compete with a permanent border. */
 .depth-cta {
   background: transparent;
-  border: 1px solid rgba(120, 150, 150, 0.3);
+  border: 0;
   font-family: var(--font-system);
   font-size: 14px;
-  letter-spacing: 0.1em;
-  color: var(--ink-dim);
+  letter-spacing: 0.22em;
+  color: #b9cccc;
+  text-shadow: 0 0 14px rgba(127, 227, 232, 0.22);
   cursor: pointer;
   min-height: 44px;
   padding: 10px 20px;
-  transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  opacity: 0.86;
+  transition: color 0.25s ease, opacity 0.25s ease, text-shadow 0.25s ease;
+  animation: depth-cta-breath 5.2s ease-in-out infinite;
   pointer-events: auto;
 }
 
+/* Slow enough to be felt rather than watched — the machine still drawing
+   power, not a pulsing call to action. */
+@keyframes depth-cta-breath {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .depth-cta:hover:not(:disabled) {
-  color: #cfe0e0;
-  border-color: rgba(120, 150, 150, 0.55);
+  color: #e2f2f2;
+  opacity: 1;
+  text-shadow: 0 0 18px rgba(127, 227, 232, 0.4);
 }
 
 .depth-cta:focus-visible {
-  outline: 1px solid var(--ink-dim);
-  outline-offset: 4px;
+  outline: 1px solid var(--cyan-dim);
+  outline-offset: 6px;
 }
 
 .depth-cta:disabled {
   color: var(--ink-faint);
-  border-color: rgba(120, 150, 150, 0.14);
+  text-shadow: none;
+  opacity: 0.5;
+  animation: none;
   cursor: default;
 }
 
@@ -376,9 +505,25 @@
   color: var(--ink-faint);
 }
 
+/* Printed, not rendered. Each line arrives on its own short delay driven
+   by the --line index SignalFrame sets, so the packet capture reads as
+   something the machine is putting out a line at a time rather than as a
+   block of copy that was always there. The first line does not land until
+   the HUD above it has named the node. */
 .signal-line {
   white-space: pre-wrap;
-  opacity: 0.75;
+  opacity: 0;
+  animation: signal-line-in 0.42s ease forwards;
+  animation-delay: calc(1.75s + var(--line, 0) * 0.09s);
+}
+
+@keyframes signal-line-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.75;
+  }
 }
 
 .signal-line--spacer {
@@ -416,15 +561,56 @@
   transform: translateY(0);
 }
 
+/* Last of all, and by a clear margin. The machine finishes saying what it
+   has to say, and only then offers the one thing the visitor can do about
+   it. Arriving with the rest of the copy is what made it read as page
+   furniture. */
 .signal-cta-block {
   align-self: center;
   text-align: center;
+  opacity: 0;
+  animation: signal-cta-in 1.3s ease 3.5s forwards;
+}
+
+@keyframes signal-cta-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .signal-hex,
   .signal-fragment {
     transition: none;
+  }
+
+  /* The staged order is the narrative and it is kept; only the fades go.
+     index.css already collapses every duration, so these delays are what
+     preserve the boot sequence as a sequence — shortened so it never
+     reads as the interface having stalled. */
+  .signal-line {
+    animation-delay: calc(0.5s + var(--line, 0) * 0.03s);
+  }
+
+  .signal-cta-block {
+    animation-delay: 1.2s;
+  }
+
+  .prelude-scanlines {
+    transition-delay: 0.1s;
+  }
+
+  .prelude-floor-glow {
+    transition-delay: 0.2s;
+  }
+
+  .prelude-hud {
+    transition-delay: 0.45s;
   }
 }
 
@@ -608,7 +794,14 @@
   max-width: 600px;
   padding: 26px 32px 22px;
   transform: translateX(2.5vw);
-  background: linear-gradient(105deg, rgba(10, 9, 8, 0.5), rgba(10, 9, 8, 0.18));
+  /* Pushed from 0.5/0.18 alpha. At the old values the room read straight
+     through the recovered document, which is exactly what made it feel
+     like a translucent modal over a render rather than a physical thing
+     pulled out of the machine. It keeps a gradient — one edge still lets
+     a little of the room through, so it is a surface in the space and not
+     a solid card pasted over it — but the body is now opaque enough to
+     hold its own light. */
+  background: linear-gradient(105deg, rgba(9, 11, 11, 0.93), rgba(9, 11, 11, 0.68));
   border-top: 1px solid rgba(150, 130, 110, 0.16);
   border-left: 1px solid rgba(150, 130, 110, 0.16);
   clip-path: polygon(0 0, 96% 0, 100% 9%, 100% 100%, 4% 100%, 0 94%);

@@ -25,8 +25,15 @@ export default function SignalFrame({ phase, onConnect }) {
           block, not the frame root, so the CTA button below stays in the
           accessibility tree and reachable by keyboard. */}
       <div className="signal-dump" aria-hidden="true">
+        {/* --line drives the per-line print stagger in prelude.css. The
+            machine puts the capture out a line at a time; it does not
+            appear as a block. */}
         {signalCopy.promptLines.map((line, i) => (
-          <div key={i} className={`signal-line${line === "" ? " signal-line--spacer" : ""}`}>
+          <div
+            key={i}
+            className={`signal-line${line === "" ? " signal-line--spacer" : ""}`}
+            style={{ "--line": i }}
+          >
             {line}
           </div>
         ))}
@@ -35,7 +42,11 @@ export default function SignalFrame({ phase, onConnect }) {
           className={`signal-hex${isResolving ? " signal-hex--active" : ""}`}
         >
           {signalCopy.hexLines.map((line, i) => (
-            <div key={i} className="signal-line signal-line--hex">
+            <div
+              key={i}
+              className="signal-line signal-line--hex"
+              style={{ "--line": signalCopy.promptLines.length + i }}
+            >
               {line}
             </div>
           ))}

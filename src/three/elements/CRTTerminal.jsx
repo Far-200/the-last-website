@@ -65,14 +65,23 @@ function CableCurve({ start, end, mid, color = "#0a0a0a", radius = 0.02 }) {
 // 0 every frame rather than eased toward 0, because an exponential ease
 // only ever approaches zero asymptotically and left a faint but real
 // residue behind SYSTEM/ARCHIVE content.
-const SCREEN_DEAD_PHASES = new Set(["system", "archive", "leaving"]);
+const SCREEN_DEAD_PHASES = new Set(["system", "archive"]);
 
 // Glow multiplier while the screen is still alive. `resolving` is
 // deliberately lower than `signal` — the visible dying beat — rather
 // than dropping straight to the SCREEN_DEAD_PHASES hard zero.
+// "awakening" is the Prelude's own opening phase (see AwakeningDolly in
+// PreludeScene). It is listed explicitly because the fallback below is
+// `?? 1` — full glow — and an unlisted phase would have had the screen at
+// its brightest on the very first frame, before the visitor has even
+// found the machine. Its awakening glow is driven by wakeRef only after
+// the camera settles, then SIGNAL owns the stable 0.5 level. LastMessage
+// never passes this phase, so its behaviour is untouched.
 const GLOW_MULTIPLIER_BY_PHASE = {
+  awakening: 0,
   signal: 0.5,
   resolving: 0.2,
+  leaving: 0.65,
 };
 
 export default function CRTTerminal({
@@ -80,6 +89,7 @@ export default function CRTTerminal({
   rotation = [0, 0, 0],
   phase = "signal",
   reduceMotion = false,
+  wakeRef,
 }) {
   const ledRef = useRef();
   const spillLightRef = useRef();
@@ -103,8 +113,11 @@ export default function CRTTerminal({
     } else {
       const breathe = reduceMotion ? 0.5 : 0.5 + Math.sin(t * 0.6) * 0.5;
       const lerpSpeed = reduceMotion ? 1 : 1 - Math.pow(0.001, delta);
+      const liveTarget = phase === "awakening" && wakeRef
+        ? THREE.MathUtils.clamp(wakeRef.current, 0, 1) * GLOW_MULTIPLIER_BY_PHASE.signal
+        : targetGlow;
       glowMultiplierRef.current +=
-        (targetGlow - glowMultiplierRef.current) * lerpSpeed;
+        (liveTarget - glowMultiplierRef.current) * lerpSpeed;
       const glowMultiplier = glowMultiplierRef.current;
 
       // The glass itself stays essentially unlit. It is seen almost
