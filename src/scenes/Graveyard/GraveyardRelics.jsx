@@ -346,8 +346,26 @@ export default function GraveyardRelics() {
 
       {/* Sited on the bearing from the camera to the monument through the
           middle of the route, so it eclipses the machine rather than
-          merely sitting near it — see FrozenSpinner's own note. */}
-      <FrozenSpinner position={[-21, -122]} />
+          merely sitting near it — see FrozenSpinner's own note.
+
+          Radius reduced 7 -> 4.9 in the readability pass, on rendered
+          evidence and for one reason only: SILHOUETTE COMPETITION. At
+          radius 7 the camera passes within ~14 units of a 14-unit arc,
+          and in the frame at t = 0.45 — the densest stretch of cemetery
+          on the whole route, the shot whose entire job is "this is a
+          graveyard" — the arc occupied 38% of the frame width and its
+          full height, as a single black curve. It was the subject, and
+          the graves behind it were background texture.
+
+          Only the radius changed. Position, rotation, sink, the buried
+          left end and the unsupported right end, and therefore both the
+          spinner read and the monument eclipse, are untouched; it still
+          crosses the sightline at the same point on the route. It now
+          subtends roughly 70% of what it did, which is still a large
+          ruined form in the middle distance and no longer the thing the
+          frame is about. Its ~10 unit clearance in the grave fields'
+          obstacle tables continues to cover it with room to spare. */}
+      <FrozenSpinner position={[-21, -122]} radius={4.9} />
       <SpinnerFragment position={[-11.5, -116]} />
 
       {/* Off to the left of the closing approach and gone from frame well

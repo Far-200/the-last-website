@@ -76,6 +76,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { groundHeightAt, routeXAt } from "./groundHeight";
 import { heroMemorials } from "../../data/graveyardRelics";
+import { eraMemorials, ERA_MEMORIAL_CLEARANCE } from "../../data/graveyardEpitaphs";
 
 // Deliberately LIGHTER than the ground's own albedo (GROUND_STONE,
 // #343b3e in GraveyardArchitecture.jsx) rather than reusing the relics'
@@ -705,6 +706,9 @@ const OBSTACLES = [
   { x: 62, z: -318, r: 9 },
   { x: -6, z: -332, r: 8 },
   { x: 30, z: -320, r: 40 },
+  // Era memorials (GraveyardEpitaphs). Wide enough that a filler row
+  // growing through one would clip visibly, so the rows break here too.
+  ...eraMemorials.map((m) => ({ x: m.position[0], z: m.position[1], r: ERA_MEMORIAL_CLEARANCE })),
 ];
 
 function violatesObstacle(x, z) {

@@ -49,10 +49,19 @@ export const EYE_HEIGHT = 1.8;
 export const CAPTCHA_X = 30;
 export const CAPTCHA_Z = -320;
 
-// Fog must be exactly HORIZON — see the header. Changing one without the
-// other reintroduces the seam.
-export const HORIZON = "#171c1f";
-export const ZENITH = "#050607";
+// Fog must be exactly HORIZON (see the header), so these two move
+// together or not at all. The semantic pass took both a step toward cold
+// navy — HORIZON gains a little blue over green, ZENITH becomes a navy
+// black rather than a neutral one — which is enough to stop the sky
+// reading as "absence of light" and start it reading as a cold dead
+// atmosphere, without introducing a colour the scene does not already
+// have. GraveyardScene imports HORIZON for its fog, so the seam the
+// backdrop exists to remove stays removed.
+export const HORIZON = "#161c23";
+export const ZENITH = "#04060c";
+// The distant lift down the route and on the rake bearing. Cold, and
+// small enough that it is a change in value rather than in hue.
+const SKY_GLOW = "#1b2530";
 
 // Albedo, not brightness. An early attempt set this to #0e1011 — linear
 // ~0.004, roughly a tenth of real asphalt — and then tried to light it.
@@ -73,6 +82,29 @@ const GROUND_CENTER_Z = -300;
 // relief the grazing key reveals, and coarser tessellation would
 // undersample it into nothing.
 const GROUND_SEGMENTS = 220;
+
+// Ground-plans of structures that are gone. Sizes, angles and spacing are
+// authored (never generated) so the site reads as having been laid out by
+// somebody, and none of them is square to the route. The last two sit
+// beyond where the visitor can walk, so the erasure carries on past the
+// end of the path.
+const FOOTPRINTS = [
+  { x: -44, z: -18, hw: 9, hd: 6, rot: 0.35 },
+  { x: -18, z: -62, hw: 13, hd: 8, rot: -0.22 },
+  { x: -40, z: -104, hw: 7, hd: 11, rot: 0.6 },
+  { x: -16, z: -146, hw: 16, hd: 9, rot: 0.18 },
+  { x: -34, z: -196, hw: 10, hd: 7, rot: -0.5 },
+  { x: 2, z: -230, hw: 12, hd: 14, rot: 0.28 },
+  { x: -24, z: -286, hw: 18, hd: 10, rot: -0.15 },
+  { x: 46, z: -348, hw: 22, hd: 13, rot: 0.4 },
+];
+
+// Local smoothstep on an already-normalized edge distance. Cheaper than
+// routing through THREE.MathUtils for ~49k vertices x 8 footprints.
+function smoothstep01(t) {
+  const x = t < 0 ? 0 : t > 1 ? 1 : t;
+  return x * x * (3 - 2 * x);
+}
 
 function Ground() {
   const geometry = useMemo(() => {
@@ -109,9 +141,51 @@ function Ground() {
       // the route so it reads as something that was here before the
       // visitor's path, not as wayfinding.
       const across = 1.4 * (wx + 30) - (wz + 100);
-      const trench = Math.exp(-Math.pow(across / 26, 2)) * 0.2;
+      let trench = Math.exp(-Math.pow(across / 26, 2)) * 0.2;
+      // Two more services on their own bearings, one broad and shallow,
+      // one narrow. Three runs crossing at three angles read as a site
+      // that was dug up repeatedly over years; one run reads as a
+      // decoration. None of them is parallel to the route.
+      const across2 = 0.7 * (wx - 20) + (wz + 260);
+      trench += Math.exp(-Math.pow(across2 / 34, 2)) * 0.14;
+      const across3 = -1.9 * (wx + 60) - (wz - 40);
+      trench += Math.exp(-Math.pow(across3 / 17, 2)) * 0.12;
 
-      const tint = 1 + patch - trench;
+      // Erased structure. Each FOOTPRINT is the ground-plan of something
+      // that stood here and was removed: the earth inside it never
+      // weathered like the earth around it, and the kerb line survives as
+      // a thin raised edge. This is the "buried interface / order
+      // breaking down" idea done as tone rather than as an object — a
+      // rectangle is the most recognisable evidence of intent there is,
+      // and a half-legible one dissolving into noisy ground says
+      // "something was built here and is gone" without a single prop.
+      //
+      // Explicitly NOT text, glyphs or circuit patterns on the floor:
+      // those read as decoration applied to a surface. These read as a
+      // surface that remembers.
+      let erased = 0;
+      for (const f of FOOTPRINTS) {
+        const dx = wx - f.x;
+        const dz = wz - f.z;
+        const c = Math.cos(f.rot);
+        const sn = Math.sin(f.rot);
+        const m = Math.max(
+          Math.abs(dx * c + dz * sn) / f.hw,
+          Math.abs(-dx * sn + dz * c) / f.hd,
+        );
+        if (m > 1.4) continue;
+        const fill = 1 - smoothstep01((m - 0.84) / 0.18);
+        const kerb = Math.exp(-Math.pow((m - 1.0) / 0.085, 2));
+        erased += kerb * 0.15 - fill * 0.07;
+      }
+
+      // A finer worn-patch octave. Short wavelength, low amplitude: at
+      // the ~6.4 units-per-segment this mesh is tessellated at it is
+      // nearly at the sampling limit, which is what makes it read as
+      // scuffing rather than as another rolling term.
+      const worn = Math.sin(wx * 0.113 + 1.3) * Math.cos(wz * 0.091 + 0.5) * 0.055;
+
+      const tint = 1 + patch + worn + erased - trench;
       colors[i * 3] = tint;
       colors[i * 3 + 1] = tint;
       colors[i * 3 + 2] = tint;
@@ -146,10 +220,30 @@ const backdropVertex = /* glsl */ `
   }
 `;
 
+// The semantic pass added three things to this, all of them additions to
+// the value the gradient already produced and none of them a new colour
+// family. The sky must stay a dead sky:
+//
+//   1. STRATA. Two very shallow haze layers just above the horizon, made
+//      by widening/narrowing the falloff rather than by drawing bands, so
+//      the atmosphere reads as settled and stratified instead of as one
+//      smooth ramp. Amplitude is tiny — this is legible as depth, not as
+//      cloud.
+//   2. A DISTANT GLOW down the route. A wide, cold, low-amplitude
+//      brightening on the -z bearing, hugging the horizon. It gives the
+//      monument something to be a silhouette against for the whole
+//      approach, and it gives the walk a direction that is not a
+//      waypoint. It is a COLD grey-blue lift of a few percent and it
+//      falls off over ~80 degrees — deliberately not a sun, not a dawn,
+//      and not on the CAPTCHA's own bearing hard enough to frame it.
+//   3. A faint counter-lift on the +x bearing, matching the scene's rake
+//      light so the sky and the ground agree about where what little
+//      light there is comes from.
 const backdropFragment = /* glsl */ `
   uniform vec3 horizonColor;
   uniform vec3 zenithColor;
   uniform vec3 transitionColor;
+  uniform vec3 glowColor;
   uniform float reveal;
   uniform float radius;
   varying vec3 vLocal;
@@ -160,6 +254,23 @@ const backdropFragment = /* glsl */ `
     // short way above it. A wide, slow falloff reads as dawn.
     vec3 c = mix(horizonColor, zenithColor, smoothstep(-0.03, 0.19, h));
     c = mix(c, zenithColor * 0.55, smoothstep(0.0, -0.2, h));
+
+    // Strata. Two shallow layers of settled haze, both above the horizon
+    // and both gone by a fifth of the way up.
+    float band1 = smoothstep(0.012, 0.038, h) * (1.0 - smoothstep(0.052, 0.086, h));
+    float band2 = smoothstep(0.094, 0.122, h) * (1.0 - smoothstep(0.138, 0.194, h));
+    c += horizonColor * (band1 * 0.42 + band2 * 0.22);
+
+    // Bearing-dependent lift. dir is the horizontal direction of this
+    // fragment on the backdrop sphere; the sphere is recentred on the
+    // camera every frame but never rotated, so these bearings are fixed
+    // in world space.
+    vec2 dir = normalize(vec2(vLocal.x, vLocal.z) + vec2(1e-5));
+    float horizonHug = 1.0 - smoothstep(-0.02, 0.16, abs(h));
+    float downRoute = smoothstep(0.25, 1.0, -dir.y);
+    float rakeSide = smoothstep(0.55, 1.0, dir.x);
+    c += glowColor * horizonHug * (downRoute * 0.85 + rakeSide * 0.3);
+
     c = mix(transitionColor, c, reveal);
     gl_FragColor = vec4(c, 1.0);
     #include <colorspace_fragment>
@@ -179,6 +290,7 @@ function Backdrop({ arrival, arrivalProgressRef }) {
           horizonColor: { value: new THREE.Color(HORIZON) },
           zenithColor: { value: new THREE.Color(ZENITH) },
           transitionColor: { value: new THREE.Color("#0d1112") },
+          glowColor: { value: new THREE.Color(SKY_GLOW) },
           reveal: { value: 0 },
           radius: { value: radius },
         },

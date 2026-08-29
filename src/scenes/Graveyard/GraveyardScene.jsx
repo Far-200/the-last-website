@@ -18,12 +18,60 @@
 //     ~2 degrees, where N·L is 0.03 and the ground measured black
 //     whatever else was tuned; 9 degrees is the balance between
 //     revealing relief and actually delivering light to it.
+//   * A LATERAL RAKE PAIR, added in the readability pass. See below.
 //   * The monument's own two lights, which belong to it and travel with
 //     it (see GraveyardCaptcha).
 //
 // Intensities are low and the ground's albedo carries the darkness
 // instead — see GROUND_STONE in GraveyardArchitecture for why that
 // division matters.
+//
+// Why a lateral rake pair had to be added
+// ---------------------------------------
+// Measured off the render, before this pass, a grave standing in the
+// foreground of the route was RGB(0, 0, 0). Not "dark" — zero. So was a
+// grave in the midground. That is not a tuning problem, it is a geometric
+// one, and no amount of albedo or fog work could have fixed it:
+//
+//   The key's direction is normalize(-120, 62, -400) — it travels almost
+//   straight DOWN the route, away from the visitor. Every surface the
+//   camera can see on an upright marker has a normal with a positive z
+//   component, so N.L is negative for all of them and the key contributes
+//   exactly nothing to any face the visitor is looking at. It lights the
+//   ground (N.L = 0.15) and the BACK of everything standing on it.
+//
+//   The only other general term was the hemisphere light, and a vertical
+//   face sits at its equator, where it returns the average of sky and
+//   ground colours — which at these values lands under the 8-bit floor
+//   once tone mapping has run.
+//
+// So the whole cemetery was rendering as pure black cut-outs against a
+// slightly-less-black ground, and adding markers could not change that.
+// Raising the hemisphere term would have fixed the black but destroyed
+// the scene: it is directionless, so it lifts every face of every object
+// equally and flattens the site into grey soup.
+//
+// The fix is two grazing lateral directional lights at about 5 degrees of
+// elevation, one either side, quite unequal:
+//
+//   * RAKE, from +x, the stronger of the two. At 5 degrees a vertical
+//     side plane sees N.L = 0.997 while the ground sees 0.087 — a 11x
+//     ratio in favour of standing stone before albedo is considered, and
+//     grave stone's albedo is itself ~3x the ground's. So it puts roughly
+//     35x more light on the side of a marker than on the dirt around it.
+//     That ratio is the entire point: it is what makes markers readable
+//     WITHOUT making the scene brighter.
+//   * COUNTER, from -x and slightly behind the visitor, at about a third
+//     the intensity. Its job is only to keep the flank the rake cannot
+//     reach at charcoal instead of black, so the field reads
+//     black -> charcoal -> faint cold grey rather than black -> grey.
+//
+// Because both are near-horizontal, which markers catch them depends on
+// each marker's own heading, so the field alternates between readable and
+// silhouetted instead of lifting as one value. Both are desaturated cold
+// greys, both ramp with the same arrival reveal as the key, and neither
+// is near the monument's own lighting in strength — the CAPTCHA stays the
+// brightest thing in the scene by a wide margin.
 //
 // Fog does the rest, and its colour is not free: it must stay exactly
 // GraveyardArchitecture's HORIZON, because that is the value the
@@ -41,6 +89,7 @@ import GraveyardArchitecture, { EYE_HEIGHT, HORIZON } from "./GraveyardArchitect
 import GraveyardRelics from "./GraveyardRelics";
 import GraveyardMemorials from "./GraveyardMemorials";
 import GraveMarkerField from "./GraveMarkerField";
+import GraveyardEpitaphs from "./GraveyardEpitaphs";
 import GraveyardCaptcha from "./GraveyardCaptcha";
 import { groundHeightAt } from "./groundHeight";
 
@@ -69,6 +118,11 @@ const WARM_Z = -332;
 const WARM_BY_PHASE = { warming: 1, leaving: 1.35 };
 const TRANSITION_DARK = "#0d1112";
 
+// The lateral rake pair (see the header). Deliberately unequal: the rake
+// models, the counter only lifts the shadow side off zero.
+const RAKE_INTENSITY = 3.4;
+const COUNTER_INTENSITY = 1.15;
+
 function ReadySignal({ onReady }) {
   const firedRef = useRef(false);
   useFrame(() => {
@@ -87,6 +141,8 @@ function Atmosphere({ arrival, arrivalProgressRef }) {
   const fogRef = useRef(null);
   const hemiRef = useRef(null);
   const keyRef = useRef(null);
+  const rakeRef = useRef(null);
+  const counterRef = useRef(null);
   const transitionColor = useRef(new THREE.Color(TRANSITION_DARK));
   const horizonColor = useRef(new THREE.Color(HORIZON));
   const fogColor = useRef(new THREE.Color());
@@ -103,6 +159,10 @@ function Atmosphere({ arrival, arrivalProgressRef }) {
     }
     if (hemiRef.current) hemiRef.current.intensity = 1.5 * (0.05 + 0.95 * reveal);
     if (keyRef.current) keyRef.current.intensity = 2.4 * (0.05 + 0.95 * reveal);
+    if (rakeRef.current) rakeRef.current.intensity = RAKE_INTENSITY * (0.05 + 0.95 * reveal);
+    if (counterRef.current) {
+      counterRef.current.intensity = COUNTER_INTENSITY * (0.05 + 0.95 * reveal);
+    }
   });
 
   return (
@@ -114,6 +174,16 @@ function Atmosphere({ arrival, arrivalProgressRef }) {
         position={[-120, 62, -400]}
         intensity={0.12}
         color="#88959a"
+      />
+      {/* See the header. Positions are directions only: both are ~5
+          degrees above horizontal so they graze standing stone and
+          almost miss the ground. */}
+      <directionalLight ref={rakeRef} position={[400, 21, -60]} intensity={0} color="#8d9ba3" />
+      <directionalLight
+        ref={counterRef}
+        position={[-400, 24, 40]}
+        intensity={0}
+        color="#6a777f"
       />
     </>
   );
@@ -199,6 +269,12 @@ export default function GraveyardScene({
           relics: it takes no arrival prop and reveals with the scene's
           own fog/light ramp. */}
       <GraveMarkerField />
+      {/* The era memorials: eight civic monuments carrying faintly-lit
+          archive plates. Static like the rest of the field, and the only
+          self-illuminated surfaces in the scene other than the monument —
+          see GraveyardEpitaphs.jsx for why, and for how their brightness
+          is set against the CAPTCHA's rather than chosen freely. */}
+      <GraveyardEpitaphs />
       <GraveyardCaptcha
         progressRef={progressRef}
         reduceMotion={reduceMotion}
