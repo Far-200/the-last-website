@@ -34,58 +34,93 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { MEMORY_POSITION } from "./layout";
 
-const PANEL_W = 0.86;
-const PANEL_H = 0.56;
+// Enlarged for the draft stop's own legibility pass. At 0.86 x 0.56 the
+// unfinished line rendered about 18 pixels tall at 1600x900 and the
+// "DRAFT / NOT SENT" header was not readable at all — so the one thing
+// the frame had to say, it could not say. 1.06 x 0.69 is the largest that
+// still sits on this table's 1.9 x 1.05 top without looking placed for
+// the camera, and it roughly doubles the line's height on screen.
+const PANEL_W = 1.06;
+const PANEL_H = 0.69;
 
-const EMISSIVE_BASE = 0.34;
+// Raised with the size. This fragment is the hero of its own stop and it
+// was reading dimmer than the table it sits on, because it happens to lie
+// inside the lamp's brightest pool — the one place in the scene where a
+// faint emissive cannot win. It now clearly leads its frame.
+const EMISSIVE_BASE = 0.62;
+// The fragment's own light. It already sits inside the lamp's pool, so
+// this is the smallest of the three — just enough that the table
+// immediately around the device is lifted by the DEVICE rather than only
+// by the lamp, which is what makes the memory read as a source instead of
+// as a lit object. Same phase table as the emissive above, so extinction
+// takes the glow and the pool together in one beat.
+const GLOW_INTENSITY = 1.15;
+const GLOW_DISTANCE = 1.5;
+
+// The caret reads a step above the line it sits at the end of, so the eye
+// lands on the unfinished edge of the sentence rather than on its start.
+const CARET_EMISSIVE = 1.5;
+
 const EMISSIVE_BY_PHASE = { dimming1: 0, dimming2: 0, dark: 0, leaving: 0 };
+
+// Canvas doubled and the type scaled with it. The words are unchanged —
+// "DRAFT / NOT SENT", the timestamp and "are you still awake" are the
+// scene's authored copy — only their size on the surface changed, which
+// is what turns the panel from a warm smudge into a sentence the visitor
+// can actually read at the stop the camera holds on.
+const CANVAS_W = 1024;
+const CANVAS_H = 666;
+
+// Where the caret sits, as fractions of the panel, so the blinking mesh
+// below and the drawn line can never drift apart.
+const CARET_FX = 0.762;
+const CARET_FY = 0.514;
 
 function useMemoryTexture() {
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 416;
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
     const ctx = canvas.getContext("2d");
 
     ctx.fillStyle = "#100c09";
-    ctx.fillRect(0, 0, 640, 416);
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
     // Machine metadata stays in the system voice; the human line shifts
     // to the archive voice. Same split Prelude and Feed already use, so
     // the fragment sounds like it belongs to this archive.
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.font = "22px 'Courier New', monospace";
-    ctx.fillStyle = "#7a6650";
-    ctx.fillText("DRAFT · NOT SENT", 44, 62);
+    ctx.font = "bold 38px 'Courier New', monospace";
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+    ctx.fillStyle = "#8d7357";
+    ctx.fillText("DRAFT · NOT SENT", 70, 100);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
 
-    ctx.font = "20px 'Courier New', monospace";
-    ctx.fillStyle = "#5d4e3d";
-    ctx.fillText("11:58 PM", 44, 100);
+    ctx.font = "32px 'Courier New', monospace";
+    ctx.fillStyle = "#6a5844";
+    ctx.fillText("11:58 PM", 70, 160);
 
-    ctx.fillStyle = "#3a3026";
-    ctx.fillRect(44, 132, 552, 1);
+    ctx.fillStyle = "#43372a";
+    ctx.fillRect(70, 212, CANVAS_W - 140, 2);
 
     // The line itself. Serif, lower case, no punctuation — typed quickly
-    // by somebody who expected to press send.
-    ctx.font = "italic 46px Georgia, 'Times New Roman', serif";
-    ctx.fillStyle = "#cbb08a";
-    ctx.fillText("are you still awake", 44, 214);
-
-    // A caret still sitting at the end of the line, because the message
-    // was never finished with. Not blinking: nothing here is animated.
-    ctx.fillStyle = "#8a7358";
-    ctx.fillRect(468, 192, 3, 44);
+    // by somebody who expected to press send. The caret that belongs at
+    // the end of it is a separate mesh so that it can blink.
+    ctx.font = "italic 74px Georgia, 'Times New Roman', serif";
+    ctx.fillStyle = "#d8bc93";
+    ctx.fillText("are you still awake", 70, CANVAS_H * CARET_FY);
 
     // Degradation, same technique the CAPTCHA panel uses — dead rows on
-    // a display that has been on far too long.
+    // a display that has been on far too long. Kept clear of the line
+    // itself now that the line is the point of the frame.
     ctx.globalCompositeOperation = "destination-out";
     ctx.fillStyle = "rgba(0,0,0,0.8)";
     for (const [x, y, w, h] of [
-      [0, 78, 640, 4],
-      [0, 186, 640, 3],
-      [0, 238, 640, 6],
-      [0, 330, 640, 4],
+      [0, 126, CANVAS_W, 5],
+      [0, 258, CANVAS_W, 4],
+      [0, 470, CANVAS_W, 7],
+      [0, 560, CANVAS_W, 5],
     ]) {
       ctx.fillRect(x, y, w, h);
     }
@@ -104,6 +139,9 @@ function useMemoryTexture() {
 export default function MemoryFragment({ phase, reduceMotion }) {
   const map = useMemoryTexture();
   const materialRef = useRef(null);
+  const glowRef = useRef(null);
+  const caretRef = useRef(null);
+  const clock = useRef(0);
   const smoothed = useRef(1);
 
   useFrame((_, delta) => {
@@ -113,17 +151,55 @@ export default function MemoryFragment({ phase, reduceMotion }) {
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.01, delta);
     smoothed.current += (target - smoothed.current) * amount;
     mat.emissiveIntensity = EMISSIVE_BASE * smoothed.current;
+    if (glowRef.current) glowRef.current.intensity = GLOW_INTENSITY * smoothed.current;
+    // The caret is still blinking. It is the only thing in this scene
+    // that is actively WAITING rather than merely left behind: a cursor
+    // sitting at the end of an unfinished sentence, holding the line open
+    // for somebody to come back and finish it. Slow — a little under one
+    // cycle per second, and it dies with the rest of the fragment.
+    if (caretRef.current) {
+      clock.current += delta;
+      const blink = Math.sin(clock.current * 3.1) > -0.35 ? 1 : 0.06;
+      caretRef.current.emissiveIntensity =
+        CARET_EMISSIVE * smoothed.current * (reduceMotion ? 0.75 : blink);
+    }
   });
 
   return (
     // Face-up and turned slightly, the way something gets set down rather
     // than placed. The tilt also catches the lamp across the panel
     // instead of letting it read as a flat lit rectangle.
-    <group position={MEMORY_POSITION} rotation={[-Math.PI / 2 + 0.12, 0, 0.34]}>
+    <>
+      {/* The memory as a light source — see GLOW_INTENSITY above.
+          Deliberately NOT a shadow caster: three more shadow maps for
+          a light this small would cost far more than it shows, and the
+          lamp already owns every shadow in the scene. */}
+      <pointLight
+        ref={glowRef}
+        position={[MEMORY_POSITION[0], MEMORY_POSITION[1] + 0.34, MEMORY_POSITION[2]]}
+        intensity={GLOW_INTENSITY}
+        distance={GLOW_DISTANCE}
+        decay={2}
+        color="#d9b184"
+      />
+      <group position={MEMORY_POSITION} rotation={[-Math.PI / 2 + 0.12, 0, 0.34]}>
       {/* The body of the device. */}
       <mesh position={[0, 0, -0.012]} castShadow receiveShadow>
         <boxGeometry args={[PANEL_W + 0.05, PANEL_H + 0.05, 0.022]} />
         <meshStandardMaterial color="#1b1613" roughness={0.72} metalness={0.12} />
+      </mesh>
+      {/* The caret, at the end of the line and still blinking. */}
+      <mesh
+        position={[(CARET_FX - 0.5) * PANEL_W, (0.5 - CARET_FY) * PANEL_H, 0.004]}
+      >
+        <planeGeometry args={[PANEL_W * 0.008, PANEL_H * 0.105]} />
+        <meshStandardMaterial
+          ref={caretRef}
+          color="#100c09"
+          emissive="#e6cda4"
+          emissiveIntensity={CARET_EMISSIVE}
+          roughness={0.5}
+        />
       </mesh>
       <mesh position={[0, 0, 0.002]}>
         <planeGeometry args={[PANEL_W, PANEL_H]} />
@@ -139,5 +215,6 @@ export default function MemoryFragment({ phase, reduceMotion }) {
         />
       </mesh>
     </group>
+    </>
   );
 }

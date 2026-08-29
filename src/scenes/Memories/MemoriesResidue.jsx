@@ -72,9 +72,14 @@ function matrixAt(position, rotation, scale) {
 const WOOD = "#241c15";
 const FABRIC_PAPER = "#4a4030";
 const PAPER_SHADOW = "#2c261d";
-const CERAMIC = "#302722";
-const METAL_KEY = "#302a24";
-const PLASTER = "#332e28";
+// Cooled with the architecture (see MemoriesArchitecture's palette note):
+// these are the objects that sit at or beyond the EDGE of the lamp pool,
+// so leaving them warm kept the sepia wash alive exactly where the frame
+// most needed a cold value. Paper and wood below keep their warmth — a
+// cream page and a brown table leg are warm as materials, not as lighting.
+const CERAMIC = "#2b2b2e";
+const METAL_KEY = "#2c2f33";
+const PLASTER = "#2e3033";
 
 function useResidueMaterials() {
   const materials = useMemo(
@@ -86,6 +91,20 @@ function useResidueMaterials() {
       key: new THREE.MeshStandardMaterial({ color: METAL_KEY, roughness: 0.4, metalness: 0.45 }),
       plaster: new THREE.MeshStandardMaterial({ color: PLASTER, roughness: 1, metalness: 0 }),
       cable: new THREE.MeshStandardMaterial({ color: "#151210", roughness: 0.85, metalness: 0.05 }),
+      // The one soft material in the scene, and the LIGHTEST thing in the
+      // room after the memories themselves. That is a legibility decision,
+      // not a taste one: the chair stands between the visitor and the only
+      // lamp, so everything on it is backlit and every dark material on it
+      // renders as the same black mass. At #38302a the coat was invisible
+      // — the manual look could see a chair but not a coat, which is half
+      // the sentence the entry shot has to say. A pale worn wool returns
+      // enough of the scene's cold ambient fill to hold its own shape
+      // against the chair's dark frame even with no light on its front.
+      cloth: new THREE.MeshStandardMaterial({ color: "#6b6053", roughness: 1, metalness: 0 }),
+      // Slightly lighter than the room's other wood, for the same reason:
+      // the chair's uprights have to be readable as uprights, and a
+      // silhouette needs its own internal edges or it is just a blob.
+      chairWood: new THREE.MeshStandardMaterial({ color: "#312820", roughness: 0.9, metalness: 0.02 }),
     }),
     [],
   );
@@ -119,27 +138,101 @@ function useResidueGeometries() {
 function EntryResidue({ materials }) {
   return (
     <group>
-      {/* A chair that went over, on its side, off the direct line to the
-          lamp. Four boxes: seat, two remaining legs, one snapped stub —
-          convincing silhouette, no detail worth spending geometry on
-          since it is only ever seen at a distance and an angle. */}
-      <group position={[-1.0, 0, 1.7]} rotation={[0.1, 0.6, 1.42]}>
-        <mesh material={materials.wood} castShadow>
-          <boxGeometry args={[0.42, 0.04, 0.4]} />
+      {/* THE CHAIR. The entry shot has one job — "somebody got up from
+          this desk and never came back" — and this object is the only
+          thing saying it, so it is sized and sited for legibility first.
+          Two rounds of manual looks drove where it ended up, and both
+          failures were about LIGHT rather than about size:
+            * First it sat 4.6 metres out with a 0.95 back, so it landed
+              below the lit desk in frame, unlit, on dark ground.
+            * Then it was moved to 2.9 metres and given a tall back, which
+              made it big — and it rendered as a solid black blob. The
+              coat was invisible inside it. A chair three metres from the
+              camera is four metres from the room's only lamp, and with
+              inverse-square falloff that is about a sixteenth of the
+              light the desk gets. Size cannot fix an unlit object.
+          It now sits WHERE A PERSON WOULD HAVE SAT: at the desk, 2.3
+          metres from the lamp, inside the warm island rather than in
+          front of it. That is worth roughly a third of the desk's own
+          illumination, which is enough to model the coat instead of
+          flattening it — and it is also just true, which is why it reads.
+          A third look moved it left: sitting square in front of the lamp
+          it covered both the lamp and the message, so the shot could no
+          longer say "the light is still on" or "the desk is still in
+          use". It now sits at ndc(-0.25) in the left third with the lamp
+          at -0.09 and the message at 0.13 — the three things the frame
+          has to state read left to right, side by side, none of them on
+          top of another. It is also still in frame at the draft stop,
+          cropping the lower left.
+          Yawed 0.52 rad: enough to be a three-quarter view rather than an
+          edge-on stick, and pushed back and turned off-square from the desk,
+          which is what a chair looks like when somebody stood up and did
+          not push it back in. */}
+      <group position={[-1.86, 0, 1.18]} rotation={[0, 0.62, 0.02]}>
+        {/* seat */}
+        <mesh position={[0, 0.46, 0]} material={materials.chairWood} castShadow receiveShadow>
+          <boxGeometry args={[0.46, 0.05, 0.44]} />
         </mesh>
-        <mesh position={[-0.16, 0.22, -0.16]} rotation={[0, 0, 0.05]} material={materials.wood}>
-          <cylinderGeometry args={[0.018, 0.018, 0.42, 6]} />
-        </mesh>
-        <mesh position={[0.16, 0.22, -0.16]} rotation={[0, 0, -0.04]} material={materials.wood}>
-          <cylinderGeometry args={[0.018, 0.018, 0.42, 6]} />
-        </mesh>
-        <mesh position={[-0.16, 0.22, 0.16]} rotation={[0, 0, 0.08]} material={materials.wood}>
-          <cylinderGeometry args={[0.018, 0.018, 0.16, 6]} />
-        </mesh>
-        {/* Backrest, snapped and trailing off to one side. */}
-        <mesh position={[0, 0.34, -0.2]} rotation={[0, 0.2, 0.3]} material={materials.wood}>
-          <boxGeometry args={[0.38, 0.03, 0.06]} />
-        </mesh>
+        {[
+          [-0.19, -0.18],
+          [0.19, -0.18],
+          [-0.19, 0.18],
+          [0.19, 0.18],
+        ].map(([lx, lz], i) => (
+          <mesh key={i} position={[lx, 0.23, lz]} material={materials.chairWood} castShadow>
+            <cylinderGeometry args={[0.021, 0.021, 0.46, 6]} />
+          </mesh>
+        ))}
+        {/* Tall back: two uprights to 1.22 and two rails, so the
+            silhouette has holes in it. A solid slab back would read as a
+            board; the gaps are what make it read as a chair. */}
+        <group position={[0, 0.48, -0.2]} rotation={[-0.07, 0, 0]}>
+          {[-0.19, 0.19].map((lx, i) => (
+            <mesh key={i} position={[lx, 0.37, 0]} material={materials.chairWood} castShadow>
+              <cylinderGeometry args={[0.022, 0.022, 0.74, 6]} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.72, 0]} material={materials.chairWood} castShadow>
+            <boxGeometry args={[0.44, 0.08, 0.04]} />
+          </mesh>
+          <mesh position={[0, 0.4, 0]} material={materials.chairWood} castShadow>
+            <boxGeometry args={[0.42, 0.05, 0.035]} />
+          </mesh>
+
+          {/* THE COAT, draped OVER the top rail and hanging down both
+              faces with an uneven hem. The shape has to break the chair's
+              rectangle to read as cloth — a block flush against the
+              backrest just makes the backrest thicker. */}
+          <group position={[0.03, 0.72, 0]} rotation={[0, 0.06, -0.05]}>
+            {/* the fold over the rail */}
+            <mesh material={materials.cloth} castShadow receiveShadow>
+              <boxGeometry args={[0.4, 0.09, 0.17]} />
+            </mesh>
+            {/* The body, hanging WIDER than the chair back it hangs on
+                and past its uprights on both sides. That overhang is what
+                makes it cloth: anything exactly as wide as the backrest
+                just reads as a thicker backrest. */}
+            <mesh position={[0, -0.27, -0.07]} rotation={[0.05, 0, 0.03]} material={materials.cloth} castShadow>
+              <boxGeometry args={[0.54, 0.5, 0.07]} />
+            </mesh>
+            {/* an uneven hem, one corner hanging lower than the other */}
+            <mesh position={[-0.14, -0.55, -0.07]} rotation={[0.04, 0, 0.09]} material={materials.cloth} castShadow>
+              <boxGeometry args={[0.24, 0.16, 0.06]} />
+            </mesh>
+            {/* and a shorter fall down the near face */}
+            <mesh position={[-0.01, -0.19, 0.07]} rotation={[-0.04, 0, -0.04]} material={materials.cloth} castShadow>
+              <boxGeometry args={[0.34, 0.36, 0.05]} />
+            </mesh>
+            {/* a sleeve, hanging lower than everything else and off to
+                one side — the detail that stops it being a rectangle */}
+            <mesh position={[0.22, -0.42, 0.01]} rotation={[0.06, 0, 0.26]} material={materials.cloth} castShadow>
+              <boxGeometry args={[0.12, 0.44, 0.09]} />
+            </mesh>
+            <mesh position={[-0.2, -0.34, -0.02]} rotation={[0.03, 0, -0.19]} material={materials.cloth} castShadow>
+              <boxGeometry args={[0.11, 0.33, 0.08]} />
+            </mesh>
+          </group>
+        </group>
       </group>
 
       {/* A slim cabinet-scale silhouette well past where the walls break

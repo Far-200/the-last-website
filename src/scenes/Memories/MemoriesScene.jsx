@@ -35,10 +35,11 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import MemoriesCamera from "./MemoriesCamera";
 import MemoriesArchitecture from "./MemoriesArchitecture";
 import MemoriesResidue from "./MemoriesResidue";
+import MemoriesArchive from "./MemoriesArchive";
 import MemoryFragment from "./MemoryFragment";
 import MemoryFragmentVoicemail from "./MemoryFragmentVoicemail";
 import MemoryFragmentPhoto from "./MemoryFragmentPhoto";
-import { LAMP_POSITION } from "./layout";
+import { LAMP_POSITION, lampBreath } from "./layout";
 
 // Matches MemoriesCamera's own start. Only seen for the frame before its
 // useFrame takes over, but a mismatch reads as a jump on mount.
@@ -49,7 +50,7 @@ const START = [0.9, 1.62, 5.1];
 // this exact value before handing over, so the swap has no seam.
 export const WARM_DARK = "#0b0806";
 
-const LAMP_INTENSITY_BASE = 8;
+const LAMP_INTENSITY_BASE = 10.5;
 const LAMP_INTENSITY_BY_PHASE = { dark: 0, leaving: 0 };
 
 // Owns the actual practical light's intensity ramp — kept separate from
@@ -61,6 +62,7 @@ const LAMP_INTENSITY_BY_PHASE = { dark: 0, leaving: 0 };
 function LampLight({ phase, reduceMotion }) {
   const lightRef = useRef(null);
   const smoothed = useRef(1);
+  const clock = useRef(0);
 
   useFrame((_, delta) => {
     const light = lightRef.current;
@@ -68,7 +70,12 @@ function LampLight({ phase, reduceMotion }) {
     const target = LAMP_INTENSITY_BY_PHASE[phase] ?? 1;
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.05, delta);
     smoothed.current += (target - smoothed.current) * amount;
-    light.intensity = LAMP_INTENSITY_BASE * smoothed.current;
+    // Shares the bulb mesh's own breath curve (layout.js) rather than
+    // running a second one, so the visible element and the light it casts
+    // can never drift apart.
+    clock.current += delta;
+    const breath = reduceMotion ? 1 : lampBreath(clock.current);
+    light.intensity = LAMP_INTENSITY_BASE * smoothed.current * breath;
   });
 
   return (
@@ -76,12 +83,39 @@ function LampLight({ phase, reduceMotion }) {
       ref={lightRef}
       position={LAMP_POSITION}
       intensity={LAMP_INTENSITY_BASE}
-      distance={7}
+      distance={9}
       decay={2}
-      color="#c9a173"
+      color="#cfb08d"
       castShadow
       shadow-mapSize={[1024, 1024]}
       shadow-bias={-0.0015}
+    />
+  );
+}
+
+const BOUNCE_INTENSITY = 2.2;
+
+function BounceLight({ phase, reduceMotion }) {
+  const lightRef = useRef(null);
+  const smoothed = useRef(1);
+
+  useFrame((_, delta) => {
+    const light = lightRef.current;
+    if (!light) return;
+    const target = LAMP_INTENSITY_BY_PHASE[phase] ?? 1;
+    const amount = reduceMotion ? 1 : 1 - Math.pow(0.05, delta);
+    smoothed.current += (target - smoothed.current) * amount;
+    light.intensity = BOUNCE_INTENSITY * smoothed.current;
+  });
+
+  return (
+    <pointLight
+      ref={lightRef}
+      position={[-1.62, 1.6, 2.45]}
+      intensity={BOUNCE_INTENSITY}
+      distance={3.0}
+      decay={2}
+      color="#b9a289"
     />
   );
 }
@@ -99,12 +133,17 @@ export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
           ceiling, a fourth wall, or any geometry beyond the fragments. */}
       <fog attach="fog" args={[WARM_DARK, 2.5, 18]} />
 
-      {/* The cold remainder of the Graveyard's world. Raised in the
-          correction pass: with too little of it the scene had no
-          un-warmed values left at all and read as a single orange
-          wash. This is what keeps cold in the corners so the amber can
-          be a local intrusion rather than the colour of the room. */}
-      <hemisphereLight args={["#1e272d", "#060505", 0.85]} />
+      {/* The cold remainder of the Graveyard's world - and it has to stay
+          SMALL. At 1.15 this term was lifting the two broken walls into
+          mid-grey planes that filled half the entry frame, brighter than
+          anything standing in front of them, so the empty chair had
+          nothing to separate against and the warm desk had nothing to be
+          an island in. A hemisphere light is directionless: every extra
+          unit of it goes to the largest surfaces in the room, which are
+          exactly the surfaces that should be dark. Pulled to 0.5, the
+          walls fall away, the lamp's pool becomes the only lit thing, and
+          cold survives where it belongs - in the corners, not on them. */}
+      <hemisphereLight args={["#1e2831", "#06080a", 0.5]} />
 
       {/* The lamp's practical light. Measured off the first render, this
           was much too strong: at intensity 17 over a 13-unit radius it
@@ -114,13 +153,46 @@ export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
           which is the difference between a lit room and one lit object.
           The colour is also dirtier — #e0a259 was a clean saturated
           orange; this is closer to an old tungsten bulb behind a dusty
-          shade. */}
+          shade. Desaturated one more step in the cinematic pass, from
+          #c9a173 to #cfb08d: the brief for this scene is warm IVORY, and
+          with the environment albedos now cold (see
+          MemoriesArchitecture's palette note) the light no longer has to
+          carry the warmth on its own. */}
       <LampLight phase={phase} reduceMotion={reduceMotion} />
+
+      {/* BOUNCE. The lamp shade is open at the top and sits half a metre
+          from a pale broken wall, so light leaving it upward and sideways
+          returns off that wall into the room - and this is that return,
+          not a new source.
+          It exists because of a specific, repeated failure in the entry
+          shot: the lamp sits DEEPER in the room than the chair, so from
+          the entry camera every object between the visitor and the lamp
+          is backlit, and the empty chair - the one thing that shot has to
+          say - rendered as a black mass with an invisible coat on it at
+          three different positions and two different sizes. No amount of
+          moving it fixes a light that is behind it.
+          It has to sit on the VISITOR'S side of the chair to do anything
+          at all - a first attempt put it back by the wall and it lit the
+          wall, which was the original problem with extra steps. From up
+          and slightly in front, the way a ceiling bounce actually
+          arrives, it models the chair's near face and the coat hanging on
+          it. Deliberately weak and short-range: 2.2 over 3.0 units, which
+          has fallen to almost nothing by the time it reaches the desk, so
+          the lamp keeps ownership of the island and the warm/cold split
+          survives.
+          It ramps on the same phase table as the lamp, so the room still
+          goes dark in one piece. */}
+      <BounceLight phase={phase} reduceMotion={reduceMotion} />
 
       <MemoriesCamera progressRef={progressRef} reduceMotion={reduceMotion} />
 
       <MemoriesArchitecture phase={phase} reduceMotion={reduceMotion} />
       <MemoriesResidue />
+      {/* Depth, foreground and atmosphere — the layer that stops each
+          stop being "one lit object, then dark". See MemoriesArchive.jsx;
+          it owns nothing the fragments own and its emissive panels sit at
+          a fortieth of a memory's, so it can never lead a frame. */}
+      <MemoriesArchive phase={phase} reduceMotion={reduceMotion} />
       <MemoryFragment phase={phase} reduceMotion={reduceMotion} />
       <MemoryFragmentVoicemail phase={phase} reduceMotion={reduceMotion} />
       <MemoryFragmentPhoto phase={phase} reduceMotion={reduceMotion} />

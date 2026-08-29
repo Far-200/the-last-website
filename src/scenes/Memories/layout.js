@@ -28,3 +28,19 @@ export const PHOTO_POSITION = [0.85, 0.03, -3.85]; // low, against the back wall
 // logic needs the same numbers, and a file that exports a component
 // cannot also export a plain constant without breaking fast refresh.
 export const STOPS = [0, 0.34, 0.64, 0.9];
+
+// The lamp's filament is tired. A very slow, very small variation - about
+// four percent over a seven-second period - shared by the bulb mesh
+// (MemoriesArchitecture) and the practical light that sits inside it
+// (MemoriesScene), so the visible element and the light it casts can
+// never drift apart. Each object still ramps its own value; this only
+// supplies the curve.
+//
+// It is deliberately under the threshold of reading as an effect: at four
+// percent nobody sees a light "pulsing", they see a light that is still
+// working but not well. That is the difference between a lamp that is on
+// and a lamp that is holding on. Any larger and it becomes a heartbeat,
+// which would be sentimental and game-like at once.
+export function lampBreath(t) {
+  return 1 + Math.sin(t * 0.9) * 0.028 + Math.sin(t * 0.37 + 1.7) * 0.014;
+}

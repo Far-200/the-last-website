@@ -35,6 +35,14 @@ const STRIP_H = 0.1;
 // fragment one's 0.34, which benefits from also sitting almost directly
 // under the lamp.
 const EMISSIVE_BASE = 1.0;
+// This fragment sits at the far edge of the lamp's falloff, so its own
+// light is doing real work: it is what separates the machine body, the
+// floor under it and the wall behind it from flat black, and it is the
+// reason this stop has any depth at all. Ramped on the fragment's own
+// phase table.
+const GLOW_INTENSITY = 1.05;
+const GLOW_DISTANCE = 2.1;
+
 const EMISSIVE_BY_PHASE = { dimming1: 0, dimming2: 0, dark: 0, leaving: 0 };
 
 function useTranscriptTexture() {
@@ -84,6 +92,7 @@ function useTranscriptTexture() {
 export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
   const map = useTranscriptTexture();
   const materialRef = useRef(null);
+  const glowRef = useRef(null);
   const smoothed = useRef(1);
 
   useFrame((_, delta) => {
@@ -93,14 +102,28 @@ export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.01, delta);
     smoothed.current += (target - smoothed.current) * amount;
     mat.emissiveIntensity = EMISSIVE_BASE * smoothed.current;
+    if (glowRef.current) glowRef.current.intensity = GLOW_INTENSITY * smoothed.current;
   });
 
   return (
-    <group position={VOICEMAIL_POSITION} rotation={[0, 0.42, 0]}>
+    <>
+      {/* The memory as a light source — see GLOW_INTENSITY above.
+          Deliberately NOT a shadow caster: three more shadow maps for
+          a light this small would cost far more than it shows, and the
+          lamp already owns every shadow in the scene. */}
+      <pointLight
+        ref={glowRef}
+        position={[VOICEMAIL_POSITION[0], VOICEMAIL_POSITION[1] + 0.52, VOICEMAIL_POSITION[2]]}
+        intensity={GLOW_INTENSITY}
+        distance={GLOW_DISTANCE}
+        decay={2}
+        color="#d3ac81"
+      />
+      <group position={VOICEMAIL_POSITION} rotation={[0, 0.42, 0]}>
       {/* The machine body — squat, matte, nothing like a screen. */}
       <mesh position={[0, 0.13, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.78, 0.26, 0.5]} />
-        <meshStandardMaterial color="#1c1712" roughness={0.88} metalness={0.06} />
+        <meshStandardMaterial color="#1b1e22" roughness={0.88} metalness={0.06} />
       </mesh>
       {/* The one readout slot — sits proud of the body's own front face
           (local Z = 0.25), not inside it. Originally placed at Z = 0.2,
@@ -127,5 +150,6 @@ export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
         />
       </mesh>
     </group>
+    </>
   );
 }

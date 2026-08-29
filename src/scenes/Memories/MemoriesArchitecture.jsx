@@ -27,7 +27,7 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { LAMP_POSITION } from "./layout";
+import { LAMP_POSITION, lampBreath } from "./layout";
 
 const FLOOR_Y = 0;
 
@@ -39,10 +39,26 @@ const FLOOR_Y = 0;
 // principle as the Graveyard's ground, run the other direction: there
 // the albedo was too dark to receive any light, here it was light enough
 // to return too much.
-const FLOOR_MAT = "#1f1a17";
-const WALL_MAT = "#241e1b";
-const WOOD_MAT = "#281f17";
-const METAL_MAT = "#201b18";
+// The cinematic pass changed the HUE of these, not their value, and it is
+// the single most important change in that pass. Every one of them used to
+// be a warm brown, and the only light in the scene is a warm lamp — so
+// warm light landed on warm surfaces and the entire frame resolved to one
+// sepia value with nothing to be warm AGAINST. Measured off the render,
+// the walls, the floor, the table and the lamp pool were all the same
+// drained orange, and "the memory is the light source" was invisible
+// because everything was already the colour of the light.
+//
+// These are now cold, desaturated charcoal at the same low values. The
+// lamp's warmth is unchanged, but it now has somewhere to fall: a surface
+// inside the pool reads warm ivory, the same surface two metres away
+// reads cold grey, and the difference between those two states is the
+// scene's whole emotional argument. Wood stays faintly brown because wood
+// is brown — it is the one material allowed to keep its hue, and it reads
+// as warm-by-material rather than warm-by-light.
+const FLOOR_MAT = "#1a1b1d";
+const WALL_MAT = "#1f2124";
+const WOOD_MAT = "#241d16";
+const METAL_MAT = "#1e2124";
 
 // Large enough that fog saturates well before any edge: at far = 18 the
 // nearest edge is roughly 20 units from the route, so the floor never
@@ -131,6 +147,7 @@ function Surface() {
 }
 
 const LAMP_EMISSIVE_BASE = 2.6;
+
 // Holds through both fragment fades so the lamp is still the last
 // visible thing giving the room shape, then dies at "dark" alongside the
 // third fragment — the room and the last memory go dark together.
@@ -145,13 +162,17 @@ function Lamp({ phase, reduceMotion }) {
   const bulbRef = useRef(null);
   const smoothed = useRef(1);
 
+  const clock = useRef(0);
+
   useFrame((_, delta) => {
     const mat = bulbRef.current;
     if (!mat) return;
     const target = LAMP_EMISSIVE_BY_PHASE[phase] ?? 1;
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.05, delta);
     smoothed.current += (target - smoothed.current) * amount;
-    mat.emissiveIntensity = LAMP_EMISSIVE_BASE * smoothed.current;
+    clock.current += delta;
+    const breath = reduceMotion ? 1 : lampBreath(clock.current);
+    mat.emissiveIntensity = LAMP_EMISSIVE_BASE * smoothed.current * breath;
   });
 
   return (
@@ -172,7 +193,7 @@ function Lamp({ phase, reduceMotion }) {
         <meshStandardMaterial
           ref={bulbRef}
           color="#4a3a26"
-          emissive="#e0a259"
+          emissive="#dcb488"
           emissiveIntensity={LAMP_EMISSIVE_BASE}
           roughness={0.6}
         />
@@ -197,7 +218,7 @@ function LampCrate() {
       receiveShadow
     >
       <boxGeometry args={[0.62, 0.68, 0.55]} />
-      <meshStandardMaterial color="#2c2520" roughness={0.94} metalness={0} />
+      <meshStandardMaterial color="#232529" roughness={0.94} metalness={0} />
     </mesh>
   );
 }

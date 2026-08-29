@@ -51,6 +51,23 @@ const EMISSIVE_BASE = 0.8;
 // while the other two go dark elsewhere in the room — and only
 // extinguishes at "dark", the beat immediately before the scene fades
 // out entirely.
+// The largest of the three local lights, because this stop had none at
+// all: the lamp is more than three metres away here, so before this pass
+// the final frame of the entire scene was one small rectangle in an
+// otherwise pure black void. This light is what gives the closing
+// composition a floor, a wall behind it and debris around it. It holds
+// through dimming1/dimming2 with the emissive and dies at "dark", so the
+// last thing that happens in Memories is still this memory going out.
+// Held half a metre ABOVE the print rather than at it. A point light with
+// decay 2 sitting 0.16 units off a surface delivers roughly ten times the
+// irradiance to that surface as to anything a metre away, which in the
+// first render blew the photo to near-white and left its surroundings
+// black — the exact opposite of the job. Lifted and weakened, the falloff
+// across the print is gentle and the light reaches the floor, the debris
+// and the wall behind it.
+const GLOW_INTENSITY = 1.45;
+const GLOW_DISTANCE = 2.8;
+
 const EMISSIVE_BY_PHASE = { dark: 0, leaving: 0 };
 
 function usePhotoTexture() {
@@ -107,6 +124,7 @@ function usePhotoTexture() {
 export default function MemoryFragmentPhoto({ phase, reduceMotion }) {
   const map = usePhotoTexture();
   const materialRef = useRef(null);
+  const glowRef = useRef(null);
   const smoothed = useRef(1);
 
   useFrame((_, delta) => {
@@ -116,13 +134,27 @@ export default function MemoryFragmentPhoto({ phase, reduceMotion }) {
     const amount = reduceMotion ? 1 : 1 - Math.pow(0.02, delta);
     smoothed.current += (target - smoothed.current) * amount;
     mat.emissiveIntensity = EMISSIVE_BASE * smoothed.current;
+    if (glowRef.current) glowRef.current.intensity = GLOW_INTENSITY * smoothed.current;
   });
 
   return (
     // Lying face up (-PI/2 about X) with a small tilt and a yaw for
     // orientation-only character, not for facing the camera — see the
     // file header for why this fragment stopped trying to stand upright.
-    <group position={PHOTO_POSITION} rotation={[-Math.PI / 2 + 0.1, 0.4, 0.12]}>
+    <>
+      {/* The memory as a light source — see GLOW_INTENSITY above.
+          Deliberately NOT a shadow caster: three more shadow maps for
+          a light this small would cost far more than it shows, and the
+          lamp already owns every shadow in the scene. */}
+      <pointLight
+        ref={glowRef}
+        position={[PHOTO_POSITION[0], PHOTO_POSITION[1] + 0.5, PHOTO_POSITION[2]]}
+        intensity={GLOW_INTENSITY}
+        distance={GLOW_DISTANCE}
+        decay={2}
+        color="#dcb88e"
+      />
+      <group position={PHOTO_POSITION} rotation={[-Math.PI / 2 + 0.1, 0.4, 0.12]}>
       {/* The torn-edge shadow lip: a real box with actual depth (0.02),
           not a second coplanar-ish plane — an earlier version offset a
           second plane by only 0.006 units, which is a textbook
@@ -148,5 +180,6 @@ export default function MemoryFragmentPhoto({ phase, reduceMotion }) {
         />
       </mesh>
     </group>
+    </>
   );
 }
