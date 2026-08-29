@@ -36,8 +36,12 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { PHOTO_POSITION } from "./layout";
 
-const PHOTO_W = 0.5;
-const PHOTO_H = 0.38;
+// Enlarged for the closing frame's own legibility pass. This is the last
+// image of the whole experience and the print was reading as a small
+// bright card; at 0.72 it is a photograph somebody is holding the size
+// of, and the caption under it resolves without the camera moving.
+const PHOTO_W = 0.72;
+const PHOTO_H = 0.55;
 
 // Emissive (0.8) ended up in the same range as the other two — voicemail
 // at 1.0, fragment one at 0.34 — rather than staying the dimmest as

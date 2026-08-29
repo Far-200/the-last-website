@@ -41,9 +41,68 @@ const EMISSIVE_BASE = 1.0;
 // reason this stop has any depth at all. Ramped on the fragment's own
 // phase table.
 const GLOW_INTENSITY = 1.05;
+
+// --- The unheard-message indicator ---------------------------------------
+// The one thing this stop was missing. A lit transcript on a box says "a
+// machine with writing on it"; it does not say "there is a voice in here
+// that nobody has played". The object that says that, unmistakably and
+// without a word of UI, is the message counter on an answering machine:
+// a single digit, blinking, because the count has not been cleared.
+//
+// It is deliberately the ONLY indicator on the machine — the brief asks
+// for one — and it is chunky hardware type on a recessed readout, not an
+// app badge. Beside it sits a small static waveform, which is the other
+// half of the sentence: what is waiting is a VOICE, not a notification.
+const READOUT_W = 0.42;
+const READOUT_H = 0.145;
+// High, because this indicator has to win against the machine's own top
+// face — which sits directly under the fragment's glow light and is one
+// of the brightest surfaces at this stop. A first attempt at 1.35 on a
+// flush panel simply dissolved into the lit casing.
+const READOUT_EMISSIVE = 3.2;
 const GLOW_DISTANCE = 2.1;
 
 const EMISSIVE_BY_PHASE = { dimming1: 0, dimming2: 0, dark: 0, leaving: 0 };
+
+// The readout face: a blinking "1" and a short waveform, drawn once.
+function useReadoutTexture() {
+  const texture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 384;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#050403";
+    ctx.fillRect(0, 0, 384, 128);
+
+    // The count. Seven-segment proportions rather than a typeface, so it
+    // reads as a machine from the era this thing came from. Thick, because
+    // at this stop the readout is 1.9 metres from the camera and a hairline
+    // digit is a smudge.
+    ctx.fillStyle = "#ffd9a4";
+    ctx.fillRect(72, 18, 22, 92);
+    ctx.fillRect(40, 40, 32, 20);
+
+    // The waveform: a voice, held. Symmetrical about the centre line and
+    // decaying at both ends the way a short recording looks in any
+    // transport that has ever displayed one.
+    const midY = 64;
+    const bars = [10, 20, 34, 24, 50, 62, 40, 70, 54, 30, 44, 60, 38, 22, 14, 8];
+    ctx.fillStyle = "#e3b47e";
+    bars.forEach((h, i) => {
+      const x = 142 + i * 15;
+      ctx.fillRect(x, midY - h / 2, 8, h);
+    });
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    return t;
+  }, []);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
+}
 
 function useTranscriptTexture() {
   const texture = useMemo(() => {
@@ -91,8 +150,11 @@ function useTranscriptTexture() {
 
 export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
   const map = useTranscriptTexture();
+  const readoutMap = useReadoutTexture();
   const materialRef = useRef(null);
   const glowRef = useRef(null);
+  const readoutRef = useRef(null);
+  const clock = useRef(0);
   const smoothed = useRef(1);
 
   useFrame((_, delta) => {
@@ -103,6 +165,17 @@ export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
     smoothed.current += (target - smoothed.current) * amount;
     mat.emissiveIntensity = EMISSIVE_BASE * smoothed.current;
     if (glowRef.current) glowRef.current.intensity = GLOW_INTENSITY * smoothed.current;
+    // Blinks on the machine's own slow clock: about a second on, a
+    // little under a second off, which is the cadence of a device that
+    // has been signalling into an empty room for a very long time. It
+    // dies with the rest of the fragment, so when the voice stops being
+    // held the light that was holding it stops too.
+    if (readoutRef.current) {
+      clock.current += delta;
+      const on = Math.sin(clock.current * 3.4) > -0.15 ? 1 : 0.05;
+      readoutRef.current.emissiveIntensity =
+        READOUT_EMISSIVE * smoothed.current * (reduceMotion ? 0.7 : on);
+    }
   });
 
   return (
@@ -125,6 +198,45 @@ export default function MemoryFragmentVoicemail({ phase, reduceMotion }) {
         <boxGeometry args={[0.78, 0.26, 0.5]} />
         <meshStandardMaterial color="#1b1e22" roughness={0.88} metalness={0.06} />
       </mesh>
+      {/* The message counter, flat on the machine's top face. This stop's
+          camera pitches 43 degrees down, so the top face is the one
+          surface here presented almost square to the visitor — an
+          indicator on the front would have been a sliver. */}
+      <mesh position={[-0.16, 0.272, -0.02]} rotation={[-Math.PI / 2, 0, 0.02]}>
+        <planeGeometry args={[READOUT_W, READOUT_H]} />
+        <meshStandardMaterial
+          ref={readoutRef}
+          map={readoutMap}
+          emissiveMap={readoutMap}
+          emissive="#d9a86f"
+          emissiveIntensity={READOUT_EMISSIVE}
+          color="#0a0705"
+          roughness={0.45}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* A real recess, not a bezel: four short walls standing proud of
+          the case with the readout dropped 1.5cm below them. The walls
+          shade the panel from the fragment's own glow, which is the only
+          way a small emissive display stays darker than the lit casing
+          around it — the same problem, and the same fix, as the CAPTCHA
+          monument's reveal.
+          The panel sits at y 0.272, just ABOVE the case top at 0.26: a
+          first attempt put it at 0.246, which is inside the solid body,
+          so the display was rendering entirely behind the machine's own
+          lid and only a sliver of the digit leaked out at one edge. */}
+      {[
+        { o: [-0.16, 0.288, -0.02 - READOUT_H / 2 - 0.02], s: [READOUT_W + 0.08, 0.05, 0.04] },
+        { o: [-0.16, 0.288, -0.02 + READOUT_H / 2 + 0.02], s: [READOUT_W + 0.08, 0.05, 0.04] },
+        { o: [-0.16 - READOUT_W / 2 - 0.02, 0.288, -0.02], s: [0.04, 0.05, READOUT_H + 0.08] },
+        { o: [-0.16 + READOUT_W / 2 + 0.02, 0.288, -0.02], s: [0.04, 0.05, READOUT_H + 0.08] },
+      ].map((w, i) => (
+        <mesh key={i} position={w.o} castShadow receiveShadow>
+          <boxGeometry args={w.s} />
+          <meshStandardMaterial color="#12171b" roughness={0.9} metalness={0.1} />
+        </mesh>
+      ))}
+
       {/* The one readout slot — sits proud of the body's own front face
           (local Z = 0.25), not inside it. Originally placed at Z = 0.2,
           which is 0.05 units BEHIND that face: the strip was a paper-thin

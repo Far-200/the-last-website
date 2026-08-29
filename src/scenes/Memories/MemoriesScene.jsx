@@ -120,6 +120,59 @@ function BounceLight({ phase, reduceMotion }) {
   );
 }
 
+// --- What is left when the waiting stops ---------------------------------
+// Extinction used to end on pure black, which is not the same thing as
+// absence: with every warm source ramped to zero and the cold fill at 0.5
+// there was nothing left in frame to be absent FROM, and the last beat of
+// the whole experience read as the renderer switching off.
+//
+// This is the inverse of every other ramp in the scene. It is zero for
+// the entire visit and rises only at "dark" and "leaving" — the two
+// phases in which the lamp, the photograph and the dust are going out —
+// so as the warmth drains, a thin cold light comes up behind it and the
+// room is still THERE: the chair, the desk, the open box, the print. The
+// place has not been deleted. It has stopped being held open for
+// somebody, which is a different and worse thing, and it is the sentence
+// the last frame has to say.
+//
+// It changes no timing and no state: it reads the same phase prop as
+// everything else and uses the same lerp, only with the target inverted.
+const COLD_BY_PHASE = { dark: 1, leaving: 1 };
+const COLD_INTENSITY = 1.9;
+const COLD_FILL_INTENSITY = 0.62;
+
+function ColdResidual({ reduceMotion, phase }) {
+  const keyRef = useRef(null);
+  const fillRef = useRef(null);
+  const level = useRef(0);
+
+  useFrame((_, delta) => {
+    const target = COLD_BY_PHASE[phase] ?? 0;
+    // Slower than the warm ramps it replaces, so the cold arrives after
+    // the warmth has gone rather than crossfading with it.
+    const amount = reduceMotion ? 1 : 1 - Math.pow(0.16, delta);
+    level.current += (target - level.current) * amount;
+    if (keyRef.current) keyRef.current.intensity = COLD_INTENSITY * level.current;
+    if (fillRef.current) fillRef.current.intensity = COLD_FILL_INTENSITY * level.current;
+  });
+
+  return (
+    <>
+      {/* Directional, not ambient: the room has to be MODELLED at the end
+          — a chair with a coat still on it, a desk, a box left open — and
+          a directionless fill would return the same flat grey soup the
+          entry frame had to be rescued from. */}
+      <directionalLight
+        ref={keyRef}
+        position={[-3.5, 4.2, 2.6]}
+        intensity={0}
+        color="#8fa6b8"
+      />
+      <hemisphereLight ref={fillRef} args={["#28323c", "#080a0c", 0]} />
+    </>
+  );
+}
+
 export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
   return (
     <Canvas
@@ -183,6 +236,11 @@ export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
           It ramps on the same phase table as the lamp, so the room still
           goes dark in one piece. */}
       <BounceLight phase={phase} reduceMotion={reduceMotion} />
+
+      {/* See ColdResidual: the light that comes up as the warm light goes
+          out, so the last frame is a room that stopped waiting rather
+          than a black screen. */}
+      <ColdResidual phase={phase} reduceMotion={reduceMotion} />
 
       <MemoriesCamera progressRef={progressRef} reduceMotion={reduceMotion} />
 

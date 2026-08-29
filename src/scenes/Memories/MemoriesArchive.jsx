@@ -414,11 +414,14 @@ function StillWaiting() {
 // pitched 41 degrees down at the print 1.5 metres away): the box lands
 // right of centre at ndc(0.66, 0.36), the folded blanket left at
 // ndc(-0.61, -0.08), and the fanned prints fill the arc between them.
+// Three, not four, and all of them larger. The brief for this frame is
+// "only a few visible prints": a fan of four small rectangles read as
+// scatter, which is the clutter this shot cannot afford. Three bigger
+// ones read as prints somebody dealt out and can still count.
 const PHOTO_PRINTS = [
-  { p: [0.62, 0.014, -3.62], r: [-Math.PI / 2, 0, 0.28], s: [0.3, 0.23] },
-  { p: [1.3, 0.014, -3.98], r: [-Math.PI / 2, 0, -0.5], s: [0.32, 0.24] },
-  { p: [1.45, 0.014, -4.28], r: [-Math.PI / 2, 0, 0.65], s: [0.27, 0.35] },
-  { p: [1.05, 0.014, -4.25], r: [-Math.PI / 2, 0, -0.18], s: [0.31, 0.23] },
+  { p: [1.34, 0.014, -3.92], r: [-Math.PI / 2, 0, -0.42], s: [0.42, 0.32] },
+  { p: [1.52, 0.014, -4.34], r: [-Math.PI / 2, 0, 0.58], s: [0.34, 0.44] },
+  { p: [1.0, 0.014, -4.34], r: [-Math.PI / 2, 0, -0.14], s: [0.4, 0.3] },
 ];
 
 function PhotoFloor() {
@@ -428,9 +431,9 @@ function PhotoFloor() {
       // of prints reads as an arrangement even where the light barely
       // reaches - but far below the hero, which is the only one that
       // still carries anything.
-      print: new THREE.MeshStandardMaterial({ color: "#38332b", roughness: 0.95, metalness: 0 }),
+      print: new THREE.MeshStandardMaterial({ color: "#4a4438", roughness: 0.95, metalness: 0 }),
       card: new THREE.MeshStandardMaterial({ color: "#2a2721", roughness: 0.96, metalness: 0 }),
-      cloth: new THREE.MeshStandardMaterial({ color: "#38302a", roughness: 1, metalness: 0 }),
+      cloth: new THREE.MeshStandardMaterial({ color: "#4e4438", roughness: 1, metalness: 0 }),
     }),
     [],
   );
@@ -478,19 +481,25 @@ function PhotoFloor() {
         <boxGeometry args={[0.5, 0.04, 0.4]} />
       </mesh>
 
-      {/* A folded blanket on the floor opposite the box: this is where
-          they were sitting. */}
-      <group position={[0.3, 0, -4.15]} rotation={[0, 0.5, 0]}>
-        <mesh position={[0, 0.05, 0]} material={materials.cloth} castShadow receiveShadow>
-          <boxGeometry args={[0.62, 0.1, 0.44]} />
-        </mesh>
-        <mesh
-          position={[0.06, 0.13, -0.04]}
-          rotation={[0.04, 0.18, 0.02]}
-          material={materials.cloth}
-          castShadow
-        >
-          <boxGeometry args={[0.5, 0.07, 0.34]} />
+      {/* The cushion somebody was sitting on, opposite the box. It is
+          built as a rim with a dip in the middle rather than as a solid
+          block: a flat slab is furniture, a dented one is a place where
+          a person's weight was, and that dent is the only thing in this
+          frame that refers to a body at all. */}
+      <group position={[0.26, 0, -4.12]} rotation={[0, 0.5, 0]}>
+        {[
+          { o: [0, 0.06, -0.24], s: [0.74, 0.13, 0.16] },
+          { o: [0, 0.06, 0.24], s: [0.74, 0.13, 0.16] },
+          { o: [-0.32, 0.06, 0], s: [0.14, 0.13, 0.34] },
+          { o: [0.32, 0.06, 0], s: [0.14, 0.13, 0.34] },
+        ].map((b, i) => (
+          <mesh key={i} position={b.o} material={materials.cloth} castShadow receiveShadow>
+            <boxGeometry args={b.s} />
+          </mesh>
+        ))}
+        {/* the dip */}
+        <mesh position={[0, 0.035, 0]} material={materials.cloth} receiveShadow>
+          <boxGeometry args={[0.56, 0.07, 0.36]} />
         </mesh>
       </group>
     </group>
