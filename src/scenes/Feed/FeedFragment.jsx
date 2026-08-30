@@ -41,7 +41,7 @@
 // the substrate, and a second transparent plane at the same position
 // would only be depth-rejected by it.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import gsap from "gsap";
@@ -141,35 +141,100 @@ function FragmentBody({ fragment }) {
 }
 
 // A very small number of fragments carry a literal, dying-display glow —
-// physically motivated (this one represents a stalled upload still lit),
-// not a UI accent. Cyan stays exclusive to physical screen glow, kept
-// dirty, dim and localized. Now that there is architecture around the
-// fragments, this light lands on something: it pools on the nearby
-// column and floor rather than on nothing. Fully static under reduced
-// motion.
-function DyingScreenGlow({ reduceMotion }) {
+// physically motivated (a stalled upload and a failed image fetch, both
+// still drawing power), not a UI accent. Cyan stays exclusive to physical
+// screen glow, kept dirty, dim and localized. Now that there is
+// architecture around the fragments, this light lands on something: it
+// pools on the nearby column and floor rather than on nothing. Fully
+// static under reduced motion.
+//
+// The light used to be the whole of it, and the frame paid for that: the
+// visual audit found no Feed frame that read as POWERED, only as
+// abandoned, because a pool of cyan on a column has no visible cause. The
+// readout below is that cause — the machine, still cycling, for an upload
+// nobody is coming back to finish.
+//
+// Base emission of the readout strip, in the renderer's working (linear)
+// space — this is "#4a7a7d" converted once, so the strip and the point
+// light above it are literally the same colour rather than two cyans that
+// could drift apart. Scaled by the flicker every frame, so the bar and the
+// light it throws rise and fall together.
+const READOUT_LINEAR = [0.0685, 0.2218, 0.2332];
+// How much of that base the bar actually emits at peak. Swept in source
+// against the mid-route frame and measured at the strip's own projected
+// pixel, where the local background is 50 and the aperture backdrop — the
+// frame's intended brightest thing — is 140:
+//
+//   0.45 -> 50   (invisible; identical to the unlit frame)
+//   1.00 -> 64-86
+//   1.60 -> 92-118
+//   2.40 -> 129-148  (reaches the aperture; rejected)
+//
+// 1.6 is the value where the bar is legible within a second without
+// touching the aperture. The spread in each pair is the flicker, sampled
+// two seconds apart.
+const READOUT_GAIN = 1.6;
+
+function DyingScreenGlow({ fragment, reduceMotion }) {
   const lightRef = useRef(null);
+  const readoutRef = useRef(null);
+
+  // Sized and placed off the same proportion ScreenHousings uses for this
+  // fragment's backplate (width * 0.78), so the bar lands on the housing's
+  // lower margin — on the machine — instead of floating in front of the
+  // card. See FeedInfrastructure's ScreenHousings.
+  const readout = useMemo(() => {
+    const backplateHeight = fragment.width * 0.78;
+    return {
+      position: [0, -backplateHeight / 2 + 0.1, 0.06],
+      size: [fragment.width * 0.34, 0.075, 0.012],
+    };
+  }, [fragment.width]);
 
   useFrame(({ clock }) => {
-    if (!lightRef.current) return;
-    if (reduceMotion) {
-      lightRef.current.intensity = 0.5;
-      return;
+    const level = reduceMotion
+      ? 0.5
+      : (() => {
+          const t = clock.getElapsedTime();
+          return 0.38 + Math.max(0, Math.sin(t * 0.7) * Math.sin(t * 0.23)) * 0.32;
+        })();
+
+    if (lightRef.current) lightRef.current.intensity = level;
+    // setRGB writes into the existing Color in the working colour space —
+    // no allocation, and no second animation system: the one value above
+    // drives both the lamp and its visible source.
+    if (readoutRef.current) {
+      const k = level * READOUT_GAIN;
+      readoutRef.current.material.color.setRGB(
+        READOUT_LINEAR[0] * k,
+        READOUT_LINEAR[1] * k,
+        READOUT_LINEAR[2] * k,
+      );
     }
-    const t = clock.getElapsedTime();
-    const flicker = 0.38 + Math.max(0, Math.sin(t * 0.7) * Math.sin(t * 0.23)) * 0.32;
-    lightRef.current.intensity = flicker;
   });
 
   return (
-    <pointLight
-      ref={lightRef}
-      position={[0, 0, 0.5]}
-      color="#4a7a7d"
-      intensity={0.5}
-      distance={7}
-      decay={2}
-    />
+    <>
+      <pointLight
+        ref={lightRef}
+        position={[0, 0, 0.5]}
+        color="#4a7a7d"
+        intensity={0.5}
+        distance={7}
+        decay={2}
+      />
+
+      {/* The physical source this light has always claimed to have. A
+          status bar on the housing, still cycling for an upload that
+          stopped years ago — unlit material on purpose, because a screen
+          emits rather than receives, and fogged like everything else so
+          the arrival reveal and the threshold collapse still swallow it
+          instead of leaving a lit dot in a black frame. */}
+      <mesh ref={readoutRef} position={readout.position}>
+        <boxGeometry args={readout.size} />
+        <meshBasicMaterial color="#4a7a7d" />
+      </mesh>
+    </>
   );
 }
 
@@ -272,7 +337,9 @@ function StaticFragment({ fragment, reduceMotion }) {
 
   return (
     <group position={fragment.position} rotation={fragment.rotation}>
-      {fragment.screenGlow ? <DyingScreenGlow reduceMotion={reduceMotion} /> : null}
+      {fragment.screenGlow ? (
+        <DyingScreenGlow fragment={fragment} reduceMotion={reduceMotion} />
+      ) : null}
 
       <Html
         transform

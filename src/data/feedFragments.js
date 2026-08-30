@@ -106,9 +106,17 @@ export const feedFragments = [
   {
     // Propped on the floor of the worn path itself, tipped up toward eye
     // level. The visitor walks past it looking down.
+    // The one live-machine cue that is actually legible at mid-route:
+    // projected against FeedCamera's path this sits at px [757,456] at
+    // progress 0.42, which is the dark screen the composition audit
+    // flagged as the frame's best "still operating" candidate. The
+    // upload-stall glow above it is gone from frame by then (it passes the
+    // lens at 0.42), so without this the middle of Feed has no powered
+    // machine in it at all.
     id: "missing-photo",
     kind: "missing",
     position: [2.4, 0.9, -66],
+    screenGlow: true,
     rotation: [-0.32, -0.4, 0.06],
     width: 2.2,
     content: {
