@@ -517,6 +517,47 @@ const TOWERS = [
   { position: [4, -188], height: 12, tilt: -0.22, snapped: true },
   { position: [62, -318], height: 14, tilt: -0.05 },
   { position: [-6, -332], height: 9, tilt: 0.16, snapped: true },
+
+  // The two that carry SCALE. Everything above tops out at 20 units, and
+  // projected against GraveyardCamera the tallest of them reaches only
+  // y=290 in the discovery frame — so the upper third of that shot had no
+  // silhouette in it at all, the cemetery sat in a thin horizontal band,
+  // and the site read as a small dark lot rather than an archive that
+  // goes back further than the visitor. Nothing was missing at marker
+  // scale; what was missing was anything BETWEEN marker scale and
+  // landscape scale.
+  //
+  // These are not new vocabulary — same RelayTower, same lattice, same
+  // metal. They are only taller, and they are placed by projection rather
+  // than by eye:
+  //
+  //   [-70,-150] h40 is the near one, and it is the scale bridge. In the
+  //   discovery frame it stands 313px tall at x=374, left of centre, with
+  //   its top at y=135 — up through the empty band, overlapping the
+  //   marker rows at its foot. It is 47 units off the route, so it cannot
+  //   be clipped, and by t=0.35 it has swept to the left edge and gone.
+  //   Its whole job is the opening: a thing far bigger than a grave,
+  //   passing close enough to be measured against one.
+  //
+  //   [-20,-300] h38 is the far one, and it is the DEPTH cue. It is 257
+  //   units away at discovery, so it is small (127px) and half lost in
+  //   the fog, and it stays in frame across the entire route, growing to
+  //   680px — the field keeps producing more of these the further in you
+  //   go. Snapped, because a distant intact mast reads as a landmark and
+  //   a broken one reads as something that outlived what it served.
+  //
+  // Neither is on the monument's bearing and neither is symmetric with
+  // anything. At the closing frame the far one has slid to x=-146..18,
+  // i.e. off the left edge, so the CAPTCHA shot gains nothing to compete
+  // with. Both are mirrored into the marker-field and memorial obstacle
+  // lists so the kit breaks around them the way it does for every other
+  // tower.
+  // `spread` matters as much as height here. At the default 1.9 a
+  // 40-unit mast is a 21:1 needle that reads as a thin pole rather than
+  // as infrastructure, and a scale bridge has to have mass to be measured
+  // against. Widened to real relay proportions.
+  { position: [-70, -150], height: 40, tilt: 0.04, spread: 3.6 },
+  { position: [-20, -300], height: 38, tilt: -0.09, spread: 3.2, snapped: true },
 ];
 
 // Sightline breakers. Positions are derived from the camera's actual

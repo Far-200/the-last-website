@@ -706,6 +706,11 @@ const OBSTACLES = [
   { x: -31.5, z: -236, r: 8 },
   { x: 62, z: -318, r: 9 },
   { x: -6, z: -332, r: 8 },
+  // The two tall relay masts added for the discovery frame's scale
+  // (see GraveyardArchitecture's TOWERS). Bigger footings than the
+  // shorter towers because they are bigger structures.
+  { x: -70, z: -150, r: 13 },
+  { x: -20, z: -300, r: 12 },
   { x: 30, z: -320, r: 40 },
   // Era memorials (GraveyardEpitaphs). Wide enough that a filler row
   // growing through one would clip visibly, so the rows break here too.
