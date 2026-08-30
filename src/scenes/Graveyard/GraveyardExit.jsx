@@ -119,13 +119,38 @@ const DOOR_BY_PHASE = { opening: 1, descending: 1, leaving: 1 };
 // orange as soon as the camera reached the doorway, because the
 // threshold light sat under a ceiling only 1.9 units above it.
 //
-// These are the third set. The threshold light is both weaker and lower,
-// so the soffit above it falls off instead of being the brightest thing
-// in the shot; the shaft light has moved further down the flight so what
-// it lights is treads at a grazing angle rather than the back wall
-// head-on. The albedos above came down a step at the same time — a lit
-// stairwell is dark concrete with light falling across it, not pale
-// concrete lit dimly.
+// These are the third set. The threshold light is weaker than the first
+// two passes, so the soffit above it falls off instead of being the
+// brightest thing in the shot; the shaft light has moved further down the
+// flight so what it lights is treads at a grazing angle rather than the
+// back wall head-on. The albedos above came down a step at the same time
+// — a lit stairwell is dark concrete with light falling across it, not
+// pale concrete lit dimly.
+//
+// Where the threshold light SITS was then changed again, for the frame
+// where the warmth is first seen rather than for the frame you walk into.
+// Every amber light here is behind the wall plane, so the outward face of
+// the retaining wall has N.L <= 0 from all of them and can never be lit:
+// from the CAPTCHA's closing pose the opening was a flat amber rectangle
+// in a black cut-out, with nothing describing that it is cut into
+// anything. The fix is not to light the wall from outside — tried, and a
+// light on the outward side has nothing to hide it, so it renders as a
+// bare hotspot on the swung leaf and reads as a lamp. It is to move this
+// light forward to just inside the opening (z -2.6 -> -0.9, distance
+// 9 -> 7) so the INNER FACE OF THE OPEN LEAF catches it. The door is what
+// gains thickness, and it is a surface that is genuinely lit from inside.
+//
+// Measured at the warm frame, against the values that actually have to
+// hold: peak amber unchanged at 147, frame mean unchanged (9.05 -> 9.01),
+// the CAPTCHA panel unchanged at 8.5 and the monument face unchanged at
+// 11.4 — the warmth stays local and nothing else in the shot brightens.
+// The amber footprint stays well under 1% of frame either way; its exact
+// count is not worth quoting, because at this beat the door is still
+// swinging and where a sampled frame lands in that swing moves it by
+// several tenths of a percent. The `seam` beat is untouched (539 vs 541
+// amber pixels) because this light rides SHAFT_BY_PHASE, which is still
+// zero while the leak is alone on screen, and both the pre-warm and
+// post-failure frames measure exactly zero amber, as before.
 const SEAM_LIGHT = 18;
 const SHAFT_LIGHT = 85;
 const THRESHOLD_LIGHT = 26;
@@ -453,11 +478,15 @@ export default function GraveyardExit({ phase, reduceMotion = false }) {
         decay={2}
         color={EXIT_AMBER}
       />
+      {/* Just inside the opening rather than back on the landing, so the
+          inner face of the open leaf is what it describes. See the
+          intensity note above for why the outward face cannot be lit and
+          why lighting it from outside was rejected. */}
       <pointLight
         ref={thresholdLightRef}
-        position={[0, 0.6, -2.6]}
+        position={[0, 1.1, -0.9]}
         intensity={0}
-        distance={9}
+        distance={7}
         decay={2}
         color={EXIT_AMBER}
       />
