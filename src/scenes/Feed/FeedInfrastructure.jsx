@@ -34,7 +34,8 @@
 //   FOREGROUND  overhead runs whose sag drops into the upper frame right
 //               over a waypoint, plus one near-path leaning rack and one
 //               near-path pylon whose mid-section clips a frame edge in
-//               passing. None crosses the walking corridor.
+//               passing, plus the one fallen duct authored for the opening
+//               shot (see FallenDuct). None crosses the walking corridor.
 //   ROUTE/MID   debris clusters pulled toward the path in the route's big
 //               gaps; conduit lines whose length rushes past the camera.
 //   ARCHITECTURE rack towers and pylons filling the bare side aisles and
@@ -592,6 +593,110 @@ function DebrisClusters({ res }) {
   );
 }
 
+// --- Fallen duct -----------------------------------------------
+// The one authored near-camera occluder on the route, and the only piece
+// of Feed geometry placed for a specific shot rather than for the corridor
+// in general.
+//
+// Why it exists: measured off the render, the opening Feed frame was 41%
+// below luminance 12 and its bottom third carried no object at all — the
+// scene began behind an empty floor, with the first fragment card floating
+// in the middle distance and nothing between it and the lens. Depth needs
+// something the camera passes, not more things beyond the floor.
+//
+// Why here: the placement was solved against the camera, not eyeballed.
+// At eye height 1.75 with a 2-degree rise, anything within ~4 units of the
+// lens that is NOT on the worn path projects off the side of the frame —
+// which is precisely why the opening frame is empty, and why the answer is
+// not "put a box in the bottom-right corner". Inverting the projection at
+// the target mark puts that corner at world x 0.5-1.0, i.e. on the route
+// itself, which is not available.
+//
+// What is available is a run the camera travels ALONGSIDE. Projected along
+// the route, the near end at [4.1,0.6,0.5] sits at px[934,511] on entry,
+// crops the right edge low by px[1237,578], and has left frame past the
+// lower-right corner at the target mark, where the body of the run still
+// crosses px[996,391] to px[1120,438]. So the shot is a diagonal receding
+// from the lower-right out of frame — entered, passed and left rather than
+// looked at — and the near half is behind the lens by z=-5.
+//
+// Right aisle because the opening card sits at x=-4.2 and must keep the
+// frame; putting the mass opposite it is what makes the composition
+// asymmetric instead of a centred proscenium. Nearest camera approach to
+// the run is 5.24 units at t=0.085 against a 0.55 half-section, so it
+// cannot be clipped through, and it clears the secondary fragments at
+// [7.0,4.8,-7.8] and [8.8,2.3,-11.5] while still overlapping the rack
+// cluster behind them.
+//
+// Why a duct: it is the overhead vocabulary OverheadRuns already hangs
+// across the nave (same box profile, same metal), only down. A run that
+// came off its hangers and is lying where it fell says the building
+// stopped mid-operation; a boulder says nothing. The snapped second
+// section and the two surviving hanger stubs are what make it read as
+// broken infrastructure rather than a placed prop.
+//
+// METAL_DARK and rolled off-axis, both for the same measured reason. A
+// section left with a level top face presents a near-horizontal plane to
+// the key, which is a grazing back-light — exactly the mirror geometry
+// that used to blow the floor out (see FeedArchitecture's FLOOR_SPECULAR).
+// Measured here: level and in METAL_MID that face read 77 against columns
+// at 25, making the newest object the brightest large shape in the frame.
+// METAL_DARK alone only took it to 60, because the cause was the angle,
+// not the albedo. Rolling each section about its own long axis turns the
+// broad face out of the mirror direction, and it is also simply what a
+// duct that came off its hangers does — it lands on an edge, not flat.
+function FallenDuct({ res }) {
+  const parts = useMemo(() => {
+    // Boxes are unit cubes scaled along local +X, so each section is
+    // authored as the two world points it spans, the profile it keeps, and
+    // how far it has rolled about its own run.
+    const xAxis = new THREE.Vector3(1, 0, 0);
+    const seg = (a, b, thick, deep, roll) => {
+      const A = new THREE.Vector3(...a);
+      const dir = new THREE.Vector3(...b).sub(A);
+      const length = dir.length();
+      dir.normalize();
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(xAxis, dir);
+      quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(xAxis, roll));
+      return {
+        position: A.addScaledVector(dir, length / 2).toArray(),
+        quaternion,
+        scale: [length, thick, deep],
+      };
+    };
+
+    return [
+      // The run itself: near end resting on the floor, rising away from the
+      // lens toward the break 14 units down the aisle, rolled onto a corner.
+      { ...seg([4.1, 0.6, 0.5], [7.4, 2.55, -14.0], 1.1, 1.0, 0.72), material: res.metalDark },
+      // The section that snapped off at the break and dropped toward the
+      // outer wall, angled across the run instead of continuing it, and
+      // rolled the other way. This is the piece that makes the whole thing
+      // read as broken rather than placed.
+      { ...seg([7.7, 2.35, -14.4], [10.6, 0.5, -11.0], 1.05, 0.95, -0.5), material: res.metalDark },
+      // Two hangers still bolted to the run, pointing back at the vault it
+      // came off. Short, and deliberately no longer vertical.
+      { ...seg([5.26, 1.28, -4.58], [5.5, 2.9, -4.3], 0.22, 0.22, 0), material: res.metalDark },
+      { ...seg([6.48, 2.0, -9.94], [6.3, 3.6, -10.4], 0.2, 0.2, 0), material: res.metalDark },
+    ];
+  }, [res]);
+
+  return (
+    <group>
+      {parts.map((p, i) => (
+        <mesh
+          key={i}
+          geometry={res.box}
+          material={p.material}
+          position={p.position}
+          quaternion={p.quaternion}
+          scale={p.scale}
+        />
+      ))}
+    </group>
+  );
+}
+
 // --- Floor scorch --------------------------------------------
 // Standalone dark patches for the bare path stretches the debris skirts
 // do not cover. Same rule as FeedArchitecture's FLOOR_STAINS: value only,
@@ -771,6 +876,7 @@ export default function FeedInfrastructure() {
       <Cables res={res} />
       <ConduitLines res={res} />
       <DebrisClusters res={res} />
+      <FallenDuct res={res} />
       <FloorScorch res={res} />
       <ScreenHousings res={res} />
     </group>
