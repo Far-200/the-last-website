@@ -35,13 +35,68 @@
 //
 // Everything here remains a continuous function of refs; GSAP only
 // advances the plain arrival progress in Graveyard.jsx. This useFrame
-// remains the sole camera writer for both arrival and route progression.
+// remains the sole camera writer for arrival, route progression AND the
+// exit -- see below.
+//
+// The exit
+// --------
+// When the CAPTCHA has failed and the service door beside the monument
+// has opened (see GraveyardExit.jsx), Graveyard.jsx tweens ONE plain
+// number - exitProgressRef, 0 to 1, linear - and this component turns it
+// into an authored shot. GSAP never touches camera.position or the
+// camera's orientation here any more than it does anywhere else in the
+// project.
+//
+// On the first exit frame the camera's ACTUAL rendered pose is captured:
+// its position, and the look target normal control was writing on the
+// previous frame (kept in lastLookAt for exactly this reason). Damping
+// means the camera is not necessarily at the authored t = 1 waypoint, so
+// interpolating from the waypoint instead of from the truth would snap.
+//
+// The route is explicit piecewise interpolation rather than a spline,
+// because the shot is three distinct actions with different easings and a
+// CatmullRom through them would round off precisely the corners that
+// carry the meaning:
+//
+//   0.00 - 0.16  NOTICE.   Position held. The look target alone turns
+//                          from the failed interface - 16 degrees up and
+//                          to the right - onto the doorway, 27 degrees
+//                          left and 14 degrees down. The camera has been
+//                          staring at a dead machine; something opened
+//                          beside it; we look.
+//   0.16 - 0.60  APPROACH. Position eases from rest to rest across the
+//                          13.5 units to a stop just outside the door,
+//                          look target pinned to the doorway so it grows
+//                          in a fixed part of the frame instead of
+//                          swimming. Ending at a standstill is the beat:
+//                          you stand at a threshold before going through.
+//   0.60 - 1.00  ENTER AND DESCEND. One arc-length chain through the
+//                          threshold and down the flight, eased IN from
+//                          that standstill so it still carries speed at
+//                          the handoff rather than parking. The look
+//                          target stops being a point and becomes a
+//                          pitch, ramping to 26 degrees below horizontal
+//                          - a descent, not a dive.
+//
+// Reduced motion keeps the notice turn and drops the travel entirely (see
+// the branch below): the door still opens, the seam still appears, the
+// stairwell is still lit and the atmosphere still goes underground, but
+// the camera does not walk. The story survives; the vestibular load does
+// not.
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 import { EYE_HEIGHT, CAPTCHA_X, CAPTCHA_Z } from "./GraveyardArchitecture";
+import {
+  EXIT_APPROACH_POSE,
+  EXIT_THRESHOLD_POSE,
+  EXIT_DESCENT_POSE,
+  EXIT_DOOR_LOOK,
+  EXIT_TURN_END,
+  EXIT_WALK_END,
+} from "./exitLayout";
 
 // Kept roughly in step with groundHeight.js's ROUTE, which damps terrain
 // beneath the camera. These are the authority; that one approximates it.
@@ -78,11 +133,34 @@ const RISE_RAMP_START = 0.34;
 const EYE_DROP = 0.3;
 const ARRIVAL_DISTANCE = 14;
 
+// Where the aim stops being a fixed world point and starts being a
+// heading. Up to here the look target is the doorway itself, so the door
+// grows in a fixed part of the frame during the approach instead of
+// swimming. After it, aiming at ANY fixed point fails: the camera is
+// travelling down a 32-degree flight, so a target that does not descend
+// with it flattens out to a near-horizontal gaze within a couple of
+// units — measured off the render, at 85 per cent through the exit the
+// camera was 65 per cent down the flight and looking 4.8 degrees below
+// horizontal, which shows the far wall and none of the stair.
+//
+// So the descent aims along a PITCH instead, applied to the camera's own
+// position: 26 degrees down by the end, which puts the treads across the
+// lower half of the frame and the soffit across the top. The ramp starts
+// at +1.3 degrees, which is exactly what the fixed door target was
+// producing at the moment the handover happens, so there is no kink.
+const EXIT_LOOK_STAIR_START = 0.62;
+const EXIT_LOOK_STAIR_END = 0.88;
+const EXIT_PITCH_START = 0.023;
+const EXIT_PITCH_END = -0.46;
+const EXIT_LOOK_AHEAD = 8;
+
 export default function GraveyardCamera({
   progressRef,
   reduceMotion = false,
   arrival = false,
   arrivalProgressRef,
+  exit = false,
+  exitProgressRef,
 }) {
   const dampedProgress = useRef(0);
   const tmpPosition = useRef(new THREE.Vector3());
@@ -91,13 +169,106 @@ export default function GraveyardCamera({
   const tmpAhead = useRef(new THREE.Vector3());
   const arrivalStart = useRef(new THREE.Vector3());
   const normalStart = useRef(new THREE.Vector3());
+  // The look target normal control wrote last frame. Captured rather than
+  // recomputed so the exit begins from what the visitor is actually
+  // looking at, damping lag included.
+  const lastLookAt = useRef(new THREE.Vector3(CAPTCHA_X - FINAL_OFFSET_X, 20, CAPTCHA_Z));
+  const exitStarted = useRef(false);
+  const exitStartPos = useRef(new THREE.Vector3());
+  const exitStartLook = useRef(new THREE.Vector3());
 
   const path = useMemo(
     () => new THREE.CatmullRomCurve3(WAYPOINTS.map((p) => new THREE.Vector3(...p))),
     [],
   );
 
+  // The exit route, built once. The enter-and-descend leg is spent by ARC
+  // LENGTH rather than per-segment, so the camera does not change pace at
+  // the threshold just because the two segments have different lengths.
+  const exitRoute = useMemo(() => {
+    const approach = new THREE.Vector3(...EXIT_APPROACH_POSE);
+    const threshold = new THREE.Vector3(...EXIT_THRESHOLD_POSE);
+    const descent = new THREE.Vector3(...EXIT_DESCENT_POSE);
+    const legA = approach.distanceTo(threshold);
+    const legB = threshold.distanceTo(descent);
+    return {
+      approach,
+      threshold,
+      descent,
+      legA,
+      legB,
+      total: legA + legB,
+      doorLook: new THREE.Vector3(...EXIT_DOOR_LOOK),
+    };
+  }, []);
+
   useFrame(({ camera }, delta) => {
+    if (exit) {
+      if (!exitStarted.current) {
+        exitStarted.current = true;
+        exitStartPos.current.copy(camera.position);
+        exitStartLook.current.copy(lastLookAt.current);
+      }
+
+      const e = THREE.MathUtils.clamp(exitProgressRef?.current ?? 0, 0, 1);
+
+      // --- position ---------------------------------------------------
+      if (reduceMotion || e <= EXIT_TURN_END) {
+        camera.position.copy(exitStartPos.current);
+      } else if (e <= EXIT_WALK_END) {
+        const t = (e - EXIT_TURN_END) / (EXIT_WALK_END - EXIT_TURN_END);
+        tmpPosition.current.lerpVectors(
+          exitStartPos.current,
+          exitRoute.approach,
+          t * t * (3 - 2 * t),
+        );
+        camera.position.copy(tmpPosition.current);
+      } else {
+        const t = (e - EXIT_WALK_END) / (1 - EXIT_WALK_END);
+        const travelled = Math.pow(t, 1.5) * exitRoute.total;
+        if (travelled <= exitRoute.legA) {
+          tmpPosition.current.lerpVectors(
+            exitRoute.approach,
+            exitRoute.threshold,
+            exitRoute.legA > 0 ? travelled / exitRoute.legA : 1,
+          );
+        } else {
+          tmpPosition.current.lerpVectors(
+            exitRoute.threshold,
+            exitRoute.descent,
+            exitRoute.legB > 0 ? (travelled - exitRoute.legA) / exitRoute.legB : 1,
+          );
+        }
+        camera.position.copy(tmpPosition.current);
+      }
+
+      // --- orientation ------------------------------------------------
+      if (e <= EXIT_TURN_END) {
+        const t = EXIT_TURN_END > 0 ? e / EXIT_TURN_END : 1;
+        tmpLookAt.current.lerpVectors(
+          exitStartLook.current,
+          exitRoute.doorLook,
+          t * t * (3 - 2 * t),
+        );
+      } else if (e <= EXIT_LOOK_STAIR_START) {
+        tmpLookAt.current.copy(exitRoute.doorLook);
+      } else {
+        // Heading, not a point — see the note on EXIT_LOOK_STAIR_START.
+        const pitch = THREE.MathUtils.lerp(
+          EXIT_PITCH_START,
+          EXIT_PITCH_END,
+          THREE.MathUtils.smoothstep(e, EXIT_LOOK_STAIR_START, EXIT_LOOK_STAIR_END),
+        );
+        tmpLookAt.current.set(
+          camera.position.x,
+          camera.position.y + Math.sin(pitch) * EXIT_LOOK_AHEAD,
+          camera.position.z - Math.cos(pitch) * EXIT_LOOK_AHEAD,
+        );
+      }
+      camera.lookAt(tmpLookAt.current);
+      return;
+    }
+
     path.getPointAt(0, normalStart.current);
     path.getTangentAt(0, tmpTangent.current);
 
@@ -116,6 +287,7 @@ export default function GraveyardCamera({
       tmpAhead.current.copy(camera.position).addScaledVector(tmpTangent.current, TANGENT_DISTANCE);
       tmpLookAt.current.set(tmpAhead.current.x, camera.position.y + LOOK_RISE_FAR, tmpAhead.current.z);
       camera.lookAt(tmpLookAt.current);
+      lastLookAt.current.copy(tmpLookAt.current);
 
       if (camera.isPerspectiveCamera) {
         camera.fov = THREE.MathUtils.lerp(52, 50, arrivalT);
@@ -157,6 +329,7 @@ export default function GraveyardCamera({
       camera.position.y + THREE.MathUtils.lerp(LOOK_RISE_FAR, LOOK_RISE_NEAR, framing);
 
     camera.lookAt(tmpLookAt.current);
+    lastLookAt.current.copy(tmpLookAt.current);
   });
 
   return null;

@@ -32,18 +32,76 @@
 
 import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import MemoriesCamera from "./MemoriesCamera";
+import MemoriesArrival from "./MemoriesArrival";
 import MemoriesArchitecture from "./MemoriesArchitecture";
 import MemoriesResidue from "./MemoriesResidue";
 import MemoriesArchive from "./MemoriesArchive";
 import MemoryFragment from "./MemoryFragment";
 import MemoryFragmentVoicemail from "./MemoryFragmentVoicemail";
 import MemoryFragmentPhoto from "./MemoryFragmentPhoto";
-import { LAMP_POSITION, lampBreath } from "./layout";
+import { LAMP_POSITION, lampBreath, ARRIVAL_POSE } from "./layout";
 
-// Matches MemoriesCamera's own start. Only seen for the frame before its
-// useFrame takes over, but a mismatch reads as a jump on mount.
-const START = [0.9, 1.62, 5.1];
+// Matches MemoriesCamera's own start — which is now part-way down the
+// stair, not the room's normal opening pose. Only seen for the frame
+// before its useFrame takes over, but a mismatch reads as a jump on mount.
+const START = ARRIVAL_POSE;
+
+// Fog across arrival. The Graveyard hands over with its own fog closed to
+// far = 8, because at that moment its camera is inside a concrete shaft
+// with nothing further away than the back wall. Opening straight onto
+// this scene's resting far = 18 would therefore show, in one frame, more
+// depth than the outgoing frame had — which is exactly the kind of jump
+// the handoff exists to avoid. So the far plane starts matched and eases
+// out as the camera comes off the flight into the room.
+//
+// This is the only writer of fog in Memories; nothing else touches it.
+const ARRIVAL_FOG = [0.5, 9];
+const RESTING_FOG = [2.5, 18];
+
+function ArrivalFog({ arrival, arrivalProgressRef }) {
+  const fogRef = useRef(null);
+
+  useFrame(() => {
+    const fog = fogRef.current;
+    if (!fog) return;
+    const raw = arrival ? THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1) : 1;
+    const t = arrival ? raw * raw * (3 - 2 * raw) : 1;
+    fog.near = THREE.MathUtils.lerp(ARRIVAL_FOG[0], RESTING_FOG[0], t);
+    fog.far = THREE.MathUtils.lerp(ARRIVAL_FOG[1], RESTING_FOG[1], t);
+  });
+
+  return (
+    <fog
+      ref={fogRef}
+      attach="fog"
+      args={[WARM_DARK, ...(arrival ? ARRIVAL_FOG : RESTING_FOG)]}
+    />
+  );
+}
+
+// Fires on the Canvas's first actual rendered frame, exactly as Feed and
+// the Graveyard already do. Memories.jsx uses it to start the arrival
+// clock: this scene builds a room, three fragments, an archive layer and a
+// shadow-casting lamp on mount, and measuring a two-and-a-half-second
+// entrance against wall-clock time while that is still being uploaded to
+// the GPU would leave the entrance visibly part-finished on the first
+// frame the visitor actually sees.
+//
+// Unlike the Graveyard's, this one has no asset to wait on. Every texture
+// in Memories is drawn to a canvas synchronously and there is no glTF, so
+// first-frame readiness is genuinely the whole condition here — see
+// GraveyardScene's AssetGate for the case where it is not.
+function ReadySignal({ onReady }) {
+  const firedRef = useRef(false);
+  useFrame(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onReady?.();
+  });
+  return null;
+}
 
 // Must stay identical to `.memories-root`'s background in memories.css
 // and to `.graveyard-leave-overlay`'s colour — the Graveyard fades to
@@ -173,18 +231,32 @@ function ColdResidual({ reduceMotion, phase }) {
   );
 }
 
-export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
+export default function MemoriesScene({
+  progressRef,
+  reduceMotion,
+  phase,
+  arrival = false,
+  arrivalProgressRef,
+  onReady,
+}) {
   return (
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={{ position: START, fov: 42, near: 0.1, far: 60 }}
+      // Mounts at the Graveyard's 50, not at this scene's resting 42.
+      // MemoriesCamera's arrival branch spends the difference across the
+      // descent and lands on exactly 42, so the first painted frame here
+      // is the same lens as the last painted frame there. See its note.
+      camera={{ position: START, fov: 50, near: 0.1, far: 60 }}
       gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
     >
+      {onReady && <ReadySignal onReady={onReady} />}
+
       {/* Tight and close. This is what builds the room: past ~18 units
           everything is gone, so the corner reads as enclosed without a
-          ceiling, a fourth wall, or any geometry beyond the fragments. */}
-      <fog attach="fog" args={[WARM_DARK, 2.5, 18]} />
+          ceiling, a fourth wall, or any geometry beyond the fragments.
+          During arrival it starts tighter still — see ArrivalFog. */}
+      <ArrivalFog arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
 
       {/* The cold remainder of the Graveyard's world - and it has to stay
           SMALL. At 1.15 this term was lifting the two broken walls into
@@ -242,7 +314,18 @@ export default function MemoriesScene({ progressRef, reduceMotion, phase }) {
           than a black screen. */}
       <ColdResidual phase={phase} reduceMotion={reduceMotion} />
 
-      <MemoriesCamera progressRef={progressRef} reduceMotion={reduceMotion} />
+      <MemoriesCamera
+        progressRef={progressRef}
+        reduceMotion={reduceMotion}
+        arrival={arrival}
+        arrivalProgressRef={arrivalProgressRef}
+      />
+
+      {/* The bottom of the stair from the Graveyard. Sits entirely behind
+          the scene's normal opening pose and contributes nothing to the
+          settled room — its two spill lights ramp to zero before arrival
+          completes. See MemoriesArrival.jsx. */}
+      <MemoriesArrival arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
 
       <MemoriesArchitecture phase={phase} reduceMotion={reduceMotion} />
       <MemoriesResidue />

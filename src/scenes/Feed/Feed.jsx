@@ -39,7 +39,7 @@
 //
 // Feed -> Graveyard handoff
 // -------------------------
-// The route's camera path ends 66 units short of the aperture itself
+// The route's camera path ends 66 units short of the far aperture itself
 // (see FeedArchitecture's APERTURE_Z vs ROUTE_END_Z) — the same
 // proportion the aperture's own fog-exempt backdrop plane already uses
 // to stay a distant destination rather than a wall the camera hits. So
@@ -50,6 +50,15 @@
 // its existing fog and lights late in the same beat. `onThresholdCrossed`
 // fires only at the resulting uniform cold-dark frame, where App can keep
 // its exclusive mount swap without it reading as a page transition.
+//
+// What the departure now travels THROUGH is FeedThreshold: a collapsed
+// terminal structure standing in the last clear bay of the nave, two
+// rings at z = -131.1 and z = -135.0. The departure covers 16 units from
+// the route's end, so it passes inside both. That is the difference
+// between a frame that goes dark because the lights were turned down and
+// a frame that goes dark because the camera is inside a ruin with the fog
+// closed to six units — and the Graveyard's own arrival opens on the
+// matching shape (see GraveyardThreshold.jsx).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
@@ -107,7 +116,10 @@ const TOUCH_DRAG_THRESHOLD_PX = 6;
 // WAYPOINTS[0] the whole time costs nothing extra to support).
 const ARRIVAL_DURATION = 1.4;
 const ARRIVAL_DURATION_REDUCED = 0.35;
-const LEAVING_DURATION = 1.2;
+// Lengthened with FeedCamera's LEAVING_DISTANCE (12 -> 16) so the extra
+// travel through the threshold rings runs at the same speed the departure
+// always had, rather than turning the crossing into a lunge.
+const LEAVING_DURATION = 1.65;
 const LEAVING_DURATION_REDUCED = 0.35;
 
 export default function Feed({ onThresholdCrossed }) {

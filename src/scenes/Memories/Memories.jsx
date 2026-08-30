@@ -6,13 +6,35 @@
 // the scene architecture stays uniform even though the space itself is
 // the opposite of the one before it.
 //
-// Mounts only after the Graveyard's verification sequence has faded to
-// `#0b0806` (see Graveyard.jsx and graveyard.css). This scene's entrance
-// overlay starts at that identical value rather than at black, so the
-// two scenes share one continuous surface across the React swap: the
-// mount change happens behind a colour that never moves, and what the
-// visitor sees is warmth resolving out of the dark they were already in
-// — not a page becoming another page.
+// Arrival
+// -------
+// Mounts only after the Graveyard's verification sequence has taken the
+// visitor through a service door beside the CAPTCHA monument and part-way
+// down the stairwell behind it (see GraveyardExit.jsx and
+// GraveyardCamera's exit branch). This scene therefore no longer resolves
+// out of a warm overlay — it CONTINUES THE DESCENT. It opens standing on
+// the seventh tread of the last flight of that same stair, with the same
+// interior width, the same pitch, the same headroom and the same aim as
+// the frame the Graveyard handed over on, and eases the remaining six and
+// a half units down into the room's normal opening pose (see
+// MemoriesArrival.jsx, MemoriesCamera's arrival branch, and layout.js for
+// the measurements that make those two frames the same shot).
+//
+// The entrance overlay survives, at half a second instead of three, and
+// its job has changed: it no longer IS the transition, it only covers the
+// single frame on which React swaps one Canvas for another. It still
+// starts at exactly `#0b0806`, which is the value the Graveyard's own fog,
+// backdrop and leave overlay have all arrived at by then, so the swap
+// happens behind a colour that does not move.
+//
+// Arrival timing starts from MemoriesScene's first actually-rendered
+// frame, not from mount — the same discipline Feed and the Graveyard
+// already use. This scene builds a room, an archive layer, three
+// fragments and a shadow-casting lamp on mount; measuring a two-and-a-
+// half-second entrance against wall-clock time while that is still being
+// uploaded would leave it visibly part-finished on the first frame the
+// visitor sees. Input is discarded outright during arrival rather than
+// buffered, so nothing accumulated jumps the camera the instant it ends.
 //
 // Extinction and the Memories -> Last Message handoff
 // -----------------------------------------------------
@@ -80,6 +102,30 @@ const TOUCH_PROGRESS_MULTIPLIER = 3;
 // progress change — so a plain tap does nothing.
 const TOUCH_DRAG_THRESHOLD_PX = 6;
 
+// Arrival duration across the 6.8 units remaining on the flight. The
+// speed matching that keeps this one continuous move rather than two
+// lives in MemoriesCamera's easing exponent, not here; this only sets how
+// long the visitor is on the stair, and three seconds is what it takes
+// for the descent to be something they watch rather than something that
+// has already happened.
+const ARRIVAL_DURATION = 3;
+const ARRIVAL_DURATION_REDUCED = 0.3;
+// Overlay time on this side of the swap. Short, because what it covers is
+// a frame that has almost stopped changing rather than a cut.
+const ENTRANCE_FADE = 0.45;
+const ENTRANCE_FADE_REDUCED = 0.25;
+// Safety net for the readiness signal, matching the Graveyard's. Memories
+// has no asynchronous asset at all, so this should never fire; it exists
+// so a lost frame callback degrades to a slightly early entrance rather
+// than to a scene that never starts.
+const READY_TIMEOUT_MS = 3000;
+
+// Spoken while the camera is still on the stair. The visual beat — the
+// stairwell opening out into a small lit corner — is geometry and light,
+// neither of which a screen reader can reach.
+const ARRIVAL_NARRATION =
+  "The stairs come down into a small room below ground. It is warm, and much smaller than the place above.";
+
 // One narration stage per camera stop (see MemoriesCamera's STOPS),
 // mirroring the Graveyard's own STAGE_AT/NARRATION split — carried non-
 // visually since the visual recognition here is a camera move and an
@@ -107,6 +153,11 @@ export default function Memories({ onMemoriesComplete }) {
   const leaveRef = useRef(null);
   const entranceTlRef = useRef(null);
   const extinctionTlRef = useRef(null);
+  const arrivalProgressRef = useRef(0);
+  const arrivalTweenRef = useRef(null);
+  const arrivalStartedRef = useRef(false);
+  const arrivingRef = useRef(true);
+  const [arrivalPhase, setArrivalPhase] = useState("arrival");
   const [stage, setStage] = useState(0);
 
   // Single-fire guard for the extinction trigger — mirrors Feed's
@@ -117,24 +168,50 @@ export default function Memories({ onMemoriesComplete }) {
   const endingRef = useRef(false);
   const [phase, setPhase] = useState("idle");
 
-  const runEntrance = useCallback(() => {
-    const tl = gsap.timeline();
-    entranceTlRef.current = tl;
-    // Slower than the Graveyard's entrance and starting from a warm dark
-    // rather than black: the Graveyard arrived as a hard threshold, this
-    // one has to arrive as something thawing.
-    tl.to(overlayRef.current, {
+  // Started from MemoriesScene's onReady — its first actually-rendered
+  // frame — not from a mount effect. Guarded to fire once: React
+  // StrictMode double-invokes effects in development, and the timeout
+  // safety net below can race the real signal.
+  const handleSceneReady = useCallback(() => {
+    if (arrivalStartedRef.current) return;
+    arrivalStartedRef.current = true;
+
+    // The overlay and the camera run together rather than in sequence.
+    // The point of the overlay is to cover the mount swap, not to be the
+    // entrance, so the visitor is already moving down the last of the
+    // stairs while it clears.
+    entranceTlRef.current = gsap.to(overlayRef.current, {
       opacity: 0,
-      duration: reduceMotion ? 0.3 : 3.2,
-      ease: "power1.inOut",
-      delay: reduceMotion ? 0.05 : 0.5,
+      duration: reduceMotion ? ENTRANCE_FADE_REDUCED : ENTRANCE_FADE,
+      ease: "power1.out",
+    });
+
+    // Linear, exactly like Feed's and the Graveyard's: MemoriesCamera
+    // applies its own ease-out remap, and MemoriesArrival its own
+    // light-fade window, to this one raw value.
+    arrivalTweenRef.current = gsap.to(arrivalProgressRef, {
+      current: 1,
+      duration: reduceMotion ? ARRIVAL_DURATION_REDUCED : ARRIVAL_DURATION,
+      ease: "none",
+      onComplete: () => {
+        arrivalProgressRef.current = 1;
+        arrivingRef.current = false;
+        setArrivalPhase("interactive");
+      },
     });
   }, [reduceMotion]);
 
+  useEffect(() => () => entranceTlRef.current?.kill(), []);
+  useEffect(() => () => arrivalTweenRef.current?.kill(), []);
+
   useEffect(() => {
-    runEntrance();
-    return () => entranceTlRef.current?.kill();
-  }, [runEntrance]);
+    const id = window.setTimeout(handleSceneReady, READY_TIMEOUT_MS);
+    return () => window.clearTimeout(id);
+  }, [handleSceneReady]);
+
+  useEffect(() => {
+    if (arrivalPhase === "interactive") rootRef.current?.focus({ preventScroll: true });
+  }, [arrivalPhase]);
 
   // Killed on unmount so no tween can write to a detached node and no
   // callback can fire against a component that is gone.
@@ -179,6 +256,10 @@ export default function Memories({ onMemoriesComplete }) {
     // ending gate, the stage narration and the extinction trigger live in
     // exactly one place and touch obeys precisely the same gates as wheel.
     const applyPixelDelta = (pixelDelta) => {
+      // Arrival is not route progress. Input during it is discarded
+      // outright rather than queued, so nothing accumulated jumps the
+      // camera the instant the descent finishes.
+      if (arrivingRef.current) return;
       // Progression stops the instant the ending begins, exactly like
       // Feed's own threshold: nothing should be able to keep nudging the
       // already-settled final camera position while the room is fading.
@@ -277,9 +358,21 @@ export default function Memories({ onMemoriesComplete }) {
   }, [beginExtinction]);
 
   return (
-    <div className="memories-root" ref={rootRef}>
+    <div
+      className="memories-root"
+      ref={rootRef}
+      tabIndex={-1}
+      data-arrival={arrivalPhase}
+    >
       <div className="memories-canvas-layer">
-        <MemoriesScene progressRef={progressRef} reduceMotion={reduceMotion} phase={phase} />
+        <MemoriesScene
+          progressRef={progressRef}
+          reduceMotion={reduceMotion}
+          phase={phase}
+          arrival={arrivalPhase === "arrival"}
+          arrivalProgressRef={arrivalProgressRef}
+          onReady={arrivalPhase === "arrival" ? handleSceneReady : undefined}
+        />
       </div>
 
       <div className="memories-vignette" aria-hidden="true" />
@@ -292,7 +385,9 @@ export default function Memories({ onMemoriesComplete }) {
       </div>
 
       <p className="memories-visually-hidden" role="status">
-        {PHASE_NARRATION[phase] ?? NARRATION[stage]}
+        {arrivalPhase === "arrival"
+          ? ARRIVAL_NARRATION
+          : (PHASE_NARRATION[phase] ?? NARRATION[stage])}
       </p>
     </div>
   );

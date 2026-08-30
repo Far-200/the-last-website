@@ -77,6 +77,7 @@ import * as THREE from "three";
 import { groundHeightAt, routeXAt } from "./groundHeight";
 import { heroMemorials } from "../../data/graveyardRelics";
 import { eraMemorials, ERA_MEMORIAL_CLEARANCE } from "../../data/graveyardEpitaphs";
+import { EXIT_OBSTACLE, ARCHIVE_MOUTH_OBSTACLE } from "./exitLayout";
 
 // Deliberately LIGHTER than the ground's own albedo (GROUND_STONE,
 // #343b3e in GraveyardArchitecture.jsx) rather than reusing the relics'
@@ -709,6 +710,15 @@ const OBSTACLES = [
   // Era memorials (GraveyardEpitaphs). Wide enough that a filler row
   // growing through one would clip visibly, so the rows break here too.
   ...eraMemorials.map((m) => ({ x: m.position[0], z: m.position[1], r: ERA_MEMORIAL_CLEARANCE })),
+  // The service stair's excavation and the ruined archive mouth the
+  // visitor arrives through. Both are structures with poured concrete
+  // footprints, so the field breaks around them exactly as it breaks
+  // around a relay tower — and in the stair's case the ground the
+  // markers would stand on has literally been removed (see
+  // GraveyardArchitecture's Ground). Coordinates come from
+  // exitLayout.js so this cannot drift away from what is built.
+  EXIT_OBSTACLE,
+  ARCHIVE_MOUTH_OBSTACLE,
 ];
 
 function violatesObstacle(x, z) {

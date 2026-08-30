@@ -40,6 +40,7 @@ import FeedSecondaryFragments from "./FeedSecondaryFragments";
 import FeedArchiveField from "./FeedArchiveField";
 import FeedInfrastructure from "./FeedInfrastructure";
 import FeedArchitecture, { APERTURE_Z, ROUTE_START_Z } from "./FeedArchitecture";
+import FeedThreshold from "./FeedThreshold";
 
 // Must stay identical to `.feed-root`'s background in feed.css.
 export const HAZE = "#0d1112";
@@ -248,6 +249,12 @@ export default function FeedScene({
       />
 
       <FeedArchitecture />
+      {/* The collapsed terminal aperture in the last clear bay of the
+          nave. Static authored geometry: it owns no camera, fog or light
+          value, it only puts something physical in the way of the
+          departure so the scene ends by going INTO somewhere rather than
+          by being turned down. See FeedThreshold.jsx. */}
+      <FeedThreshold />
       <FeedDebris />
 
       {/* The ruined information layer built into the nave — rack towers,

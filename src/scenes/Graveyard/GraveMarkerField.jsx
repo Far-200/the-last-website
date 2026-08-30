@@ -143,8 +143,12 @@ import * as THREE from "three";
 import { groundHeightAt, routeXAt } from "./groundHeight";
 import { heroMemorials } from "../../data/graveyardRelics";
 import { eraMemorials, ERA_MEMORIAL_CLEARANCE } from "../../data/graveyardEpitaphs";
+import { EXIT_OBSTACLE, ARCHIVE_MOUTH_OBSTACLE } from "./exitLayout";
 
-const KIT_URL = "/models/graveyard/grave_marker_kit_01.glb";
+// Exported so GraveyardScene can hang its readiness signal off the same
+// asset. See the AssetGate note there: the arrival clock must not start
+// until the kit has actually parsed, or 110 markers pop in behind it.
+export const KIT_URL = "/models/graveyard/grave_marker_kit_01.glb";
 
 // See header. One multiplier, applied to every instance before its own
 // per-marker variation, to bring 1-2 m Blender stock into the scene's
@@ -383,6 +387,15 @@ const OBSTACLES = [
   // authored, so they are folded in here rather than hand-copied: the kit
   // breaks around them exactly as it breaks around a tower.
   ...eraMemorials.map((m) => ({ x: m.position[0], z: m.position[1], r: ERA_MEMORIAL_CLEARANCE })),
+  // The service stair's excavation and the ruined archive mouth the
+  // visitor arrives through. Both are structures with poured concrete
+  // footprints, so the field breaks around them exactly as it breaks
+  // around a relay tower — and in the stair's case the ground the
+  // markers would stand on has literally been removed (see
+  // GraveyardArchitecture's Ground). Coordinates come from
+  // exitLayout.js so this cannot drift away from what is built.
+  EXIT_OBSTACLE,
+  ARCHIVE_MOUTH_OBSTACLE,
 ];
 
 // The monument's two-step plinth (54 x 26, centred on CAPTCHA_X/_Z) plus

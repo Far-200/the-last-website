@@ -13,15 +13,39 @@
 // timeline drives an explicit phase machine, and each phase is owned in
 // exactly one place.
 //
-//   idle      progression running, nothing interactive
-//   armed     the visitor has arrived; the checkbox row accepts input
-//   verifying beat 1 — the box ticks, the machine starts a process
-//   reaching  beat 2 — for a moment it looks like it might work
-//   failed    beat 3 — the verification service is not there any more
-//   warming   the hold, then the first warm light appears off-axis
-//   leaving   fade out, then hand off to Memories
+//   idle       progression running, nothing interactive
+//   armed      the visitor has arrived; the checkbox row accepts input
+//   verifying  beat 1 — the box ticks, the machine starts a process
+//   reaching   beat 2 — for a moment it looks like it might work
+//   failed     beat 3 — the verification service is not there any more,
+//              and the screen is HELD there long enough to read it
+//   seam       a thin warm line appears beside the monument: light
+//              leaking from the seals of a door that has been standing
+//              there the whole scene
+//   opening    the door swings; a stairwell becomes visible below it
+//   descending the camera notices it, walks to it, crosses the threshold
+//              and starts down
+//   leaving    the last half second, underground, then hand off
 //
-// GSAP drives only these discrete beats. It never touches the camera —
+// The scene's exit used to be: hold the failure, raise a warm light on
+// the ground somewhere off to the left, fade the whole page out, mount
+// Memories. Every part of that except the fade is kept — the failure copy
+// is untouched, the checkbox stays ticked, the warmth still appears
+// peripherally and unexplained at almost exactly the same bearing — but
+// the warmth now has a physical source the visitor walks into, and the
+// scene hands over because the camera is inside a small dark stairwell,
+// not because a black rectangle covered the page. The overlay still
+// exists and still runs, at half a second instead of two and a bit, as
+// insurance behind a frame that is already the colour it fades to.
+//
+// The machine has NOT accepted anybody. It is still reporting
+// VERIFICATION SERVICE UNAVAILABLE while the door opens, and its own
+// uplight is dropping away at the same time. The door is a separate
+// surviving mechanism and the scene never explains the coincidence.
+//
+// GSAP drives only these discrete beats, plus ONE plain number:
+// exitProgressRef, a linear 0-1 that GraveyardCamera reads in useFrame
+// and turns into the authored exit shot. It never touches the camera —
 // GraveyardCamera keeps sole continuous authority, per the project's
 // standing separation.
 
@@ -71,6 +95,12 @@ const TOUCH_DRAG_THRESHOLD_PX = 6;
 // arrived, and waiting for exactly 1.0 would leave the control dead at
 // what already looks like the end of the route.
 const ARM_AT = 0.99;
+
+// The phases during which GraveyardCamera runs its authored exit route
+// instead of route progression. It captures the actually-rendered pose on
+// the first of these frames, so the set has to start exactly where the
+// exit tween starts and never re-enter afterwards.
+const EXIT_PHASES = new Set(["descending", "leaving"]);
 const ARRIVAL_DURATION = 1.55;
 const ARRIVAL_DURATION_REDUCED = 0.35;
 
@@ -99,9 +129,23 @@ const PHASE_NARRATION = {
   reaching: "It is looking for something to verify a human response against.",
   failed:
     "Verification service unavailable. No verification node responded. The machine cannot confirm anyone is here.",
-  warming: "Far off to one side, in the dark beyond the monument, a small warm light appears.",
-  leaving: "Moving toward the light.",
+  seam:
+    "Off to the left of the monument, low down, a thin line of warm light appears where nothing was before.",
+  opening:
+    "The light is leaking around the edges of a service door set into a concrete structure beside the machine. The door swings slowly open. Behind it a flight of steps leads down below ground.",
+  descending:
+    "Turning away from the machine, crossing to the doorway, and starting down the stairs.",
+  leaving: "The stairwell closes in — narrow, warm and quiet.",
 };
+
+// How long to wait for GraveyardScene's readiness signal before starting
+// the arrival anyway. That signal now waits on the grave-marker kit as
+// well as on the first rendered frame (see GraveyardScene's AssetGate), so
+// a failed or very slow asset fetch would otherwise leave the scene held
+// at its opening near-black frame indefinitely. Generous, because the
+// frame being waited on is the same colour Feed handed over at and a
+// short wait is invisible; bounded, because an unbounded one is a hang.
+const READY_TIMEOUT_MS = 4000;
 
 export default function Graveyard({ onVerificationComplete }) {
   const reduceMotion = usePrefersReducedMotion();
@@ -113,6 +157,11 @@ export default function Graveyard({ onVerificationComplete }) {
   const arrivalTweenRef = useRef(null);
   const arrivalStartedRef = useRef(false);
   const arrivingRef = useRef(true);
+  // Plain number, tweened by the verification timeline and read every
+  // frame by GraveyardCamera (the shot), GraveyardScene's Atmosphere (fog
+  // and general lights) and the backdrop shader (the sky). One value,
+  // three readers, no second writer.
+  const exitProgressRef = useRef(0);
   const [stage, setStage] = useState(0);
   const [arrivalPhase, setArrivalPhase] = useState("arrival");
 
@@ -153,18 +202,25 @@ export default function Graveyard({ onVerificationComplete }) {
   }, [reduceMotion]);
 
   useEffect(() => {
+    const id = window.setTimeout(handleSceneReady, READY_TIMEOUT_MS);
+    return () => window.clearTimeout(id);
+  }, [handleSceneReady]);
+
+  useEffect(() => {
     if (arrivalPhase === "interactive") rootRef.current?.focus({ preventScroll: true });
   }, [arrivalPhase]);
 
   const handleActivate = useCallback(() => {
     if (phaseRef.current !== "armed") return;
 
-    // Reduced motion compresses the ramps and fades but NOT the holds
-    // that exist for reading. Rushing the failure copy would remove the
-    // beat rather than the motion.
+    // Reduced motion compresses the ramps and the travel but NOT the
+    // holds that exist for reading. Rushing the failure copy would remove
+    // the beat rather than the motion. `exit` collapses hardest of all,
+    // because under reduced motion GraveyardCamera holds position and
+    // only turns (see its exit branch) — there is no walk to pace.
     const d = reduceMotion
-      ? { verify: 0.8, reach: 0.5, failed: 1.9, warm: 1.2, fade: 0.5 }
-      : { verify: 1.3, reach: 0.8, failed: 1.9, warm: 2.4, fade: 2.2 };
+      ? { verify: 0.8, reach: 0.5, failed: 2.4, seam: 1.4, opening: 1.6, exit: 3.6, fade: 1.3 }
+      : { verify: 1.3, reach: 0.8, failed: 2.4, seam: 2, opening: 2.8, exit: 13, fade: 0.5 };
 
     const tl = gsap.timeline();
     verifyTlRef.current = tl;
@@ -176,20 +232,42 @@ export default function Graveyard({ onVerificationComplete }) {
 
     step(() => goto("verifying"), d.verify);
     step(() => goto("reaching"), d.reach);
+    // Beat A. The failure is left on screen with nothing happening, long
+    // enough to land: I proved I am human, and the machine has nobody
+    // left to ask.
     step(() => goto("failed"), d.failed);
-    step(() => goto("warming"), d.warm);
-    step(() => goto("leaving"), 0);
+    // Beat B, then C and D. The seam, then the door.
+    step(() => goto("seam"), d.seam);
+    step(() => goto("opening"), d.opening);
+    // Beats F through I. The door is still finishing its swing for about
+    // another second while the camera turns onto it, which is deliberate:
+    // we catch the last of the movement rather than arriving to a door
+    // that is simply open.
+    step(() => goto("descending"), 0);
 
-    // Fades to a warm near-black rather than pure black. Feed handed the
-    // Graveyard a cold, hard threshold; this one has to feel like cold
-    // giving way to something else, and Memories mounts from this exact
-    // value so the two scenes share a continuous surface across the swap.
-    tl.to(leaveRef.current, {
-      opacity: 1,
-      duration: d.fade,
-      ease: "power2.inOut",
-      onComplete: () => onVerificationComplete?.(),
-    });
+    const exitAt = tl.duration();
+    tl.to(exitProgressRef, { current: 1, duration: d.exit, ease: "none" }, exitAt);
+
+    // Beat J. The overlay is layered over the LAST half second of the
+    // descent rather than played after it, so the camera is still moving
+    // downward through the whole of it — the handoff happens mid-motion,
+    // not from a standstill. It fades to the same warm near-black the fog
+    // and the backdrop have already arrived at by that point (see
+    // exitLayout's UNDERGROUND_DARK), and Memories mounts at that same
+    // value, so what it actually conceals is a frame that has stopped
+    // changing rather than a cut.
+    const handoffAt = exitAt + d.exit - d.fade;
+    tl.call(() => goto("leaving"), null, handoffAt);
+    tl.to(
+      leaveRef.current,
+      {
+        opacity: 1,
+        duration: d.fade,
+        ease: "power2.inOut",
+        onComplete: () => onVerificationComplete?.(),
+      },
+      handoffAt,
+    );
   }, [goto, reduceMotion, onVerificationComplete]);
 
   useEffect(() => {
@@ -317,6 +395,8 @@ export default function Graveyard({ onVerificationComplete }) {
           onCaptchaActivate={handleActivate}
           arrival={arrivalPhase === "arrival"}
           arrivalProgressRef={arrivalProgressRef}
+          exit={EXIT_PHASES.has(phase)}
+          exitProgressRef={exitProgressRef}
           onReady={arrivalPhase === "arrival" ? handleSceneReady : undefined}
         />
       </div>

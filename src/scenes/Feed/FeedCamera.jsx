@@ -82,7 +82,14 @@ const LOOK_RISE = 1.4;
 export const ARRIVAL_DISTANCE = 6;
 const ARRIVAL_START = new THREE.Vector3(0, EYE_HEIGHT, ROUTE_START_Z + ARRIVAL_DISTANCE);
 const ARRIVAL_END = new THREE.Vector3(...WAYPOINTS[0]);
-const LEAVING_DISTANCE = 12;
+// How far the departure carries the camera past the route's end. Raised
+// from 12 alongside FeedThreshold: the collapsed terminal aperture's two
+// rings stand at z = -131.1 and z = -135.0, and the whole point of the
+// departure is now that the camera physically goes THROUGH both of them
+// while still travelling forward. At 16 it finishes 1.4 units past the
+// inner frame, inside the structure, with the fog closed to six units
+// around it — which is where the exclusive mount swap becomes invisible.
+const LEAVING_DISTANCE = 16;
 
 export default function FeedCamera({
   progressRef,

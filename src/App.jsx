@@ -14,8 +14,9 @@ import LastMessage from "./scenes/LastMessage/LastMessage";
 //   onThresholdCrossed    Feed, once its own fog and lights have
 //                         swallowed the final forward motion
 //   onVerificationComplete Graveyard, once the CAPTCHA's verification has
-//                         failed, the warm cue has appeared and its exit
-//                         fade has finished
+//                         failed, the service door beside the monument has
+//                         opened, and the camera has walked through it and
+//                         part-way down the stairwell behind it
 //   onMemoriesComplete    Memories, once its own extinction sequence has
 //                         faded the room to black
 //   onRestart             LastMessage's [ RECONNECT ] control, available
@@ -24,9 +25,21 @@ import LastMessage from "./scenes/LastMessage/LastMessage";
 //
 // Every one of those (other than onRestart, which is an explicit user
 // choice at a deliberately quiet moment) fires at the end of a completed
-// local transition. Feed -> Graveyard swaps at a uniform cold-dark
-// atmospheric frame, then Graveyard owns the matching reveal; the other
-// boundaries retain their own authored concealment.
+// local transition, and in both of the middle cases the concealment is
+// now the WORLD rather than an overlay:
+//
+//   Feed -> Graveyard swaps while the camera is physically inside a
+//   collapsed terminal aperture at the end of the nave with the fog
+//   closed to six units around it, and the Graveyard opens on the
+//   matching ruin on the other side of that same threshold.
+//
+//   Graveyard -> Memories swaps while the camera is four units down a
+//   concrete service stair, and Memories opens on the last flight of the
+//   same stair. Both scenes' fog, backdrop and overlay have arrived at
+//   the identical value by then, so what the swap frame contains is
+//   something that has stopped changing.
+//
+// The other boundaries retain their own authored concealment.
 //
 // There is no separate "ended" scene here. LastMessage's own post-thesis
 // state is a phase inside that component, not a sixth mounted scene —

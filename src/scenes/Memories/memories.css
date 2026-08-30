@@ -55,9 +55,12 @@
 }
 
 /* Starts opaque at the warm dark the Graveyard handed over at, and fades
-   out exactly once (see Memories.jsx's runEntrance). Because the incoming
-   value matches the outgoing one, the React mount swap happens with
-   nothing visibly changing. */
+   out exactly once, from MemoriesScene's first rendered frame (see
+   Memories.jsx's handleSceneReady). Because the incoming value matches the
+   outgoing one, the React mount swap happens with nothing visibly
+   changing — and because the camera is already descending the last of the
+   stair underneath it, what clears is a frame that is continuing rather
+   than a frame that is starting. */
 .memories-entrance-overlay {
   position: absolute;
   inset: 0;
@@ -84,6 +87,11 @@
   opacity: 0;
 }
 
+/* Held back until arrival completes, the same way the Graveyard's is.
+   The whole point of the descent is that the visitor does not perceive a
+   scene boundary; putting the new scene's name on screen while they are
+   still coming down the stairs would announce exactly the boundary the
+   transition exists to remove. */
 .memories-hud {
   position: absolute;
   top: 28px;
@@ -93,8 +101,13 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--amber-dim);
-  opacity: 0.45;
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.45s ease 0.15s;
+}
+
+.memories-root[data-arrival="interactive"] .memories-hud {
+  opacity: 0.45;
 }
 
 .memories-visually-hidden {

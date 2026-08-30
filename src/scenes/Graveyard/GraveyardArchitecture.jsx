@@ -38,6 +38,12 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { groundHeightAt } from "./groundHeight";
+import {
+  EXIT_GROUND_HOLE,
+  EXIT_SHAFT_RECT,
+  UNDERGROUND_DARK,
+  exitSink,
+} from "./exitLayout";
 
 export const GROUND_Y = 0;
 export const EYE_HEIGHT = 1.8;
@@ -192,6 +198,60 @@ function Ground() {
     }
 
     g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    // THE SERVICE STAIR'S OPENING.
+    //
+    // GraveyardExit builds a maintenance shaft that descends 6.5 units
+    // BELOW this plane. A solid ground plane occludes all of it: the
+    // sightline from a standing camera to a step three units down crosses
+    // y = 0 long before it reaches the doorway, so without an actual hole
+    // in the terrain the stairwell can only ever render as a black
+    // rectangle in a wall. It has to be a real opening.
+    //
+    // Faces are dropped by CENTROID rather than by vertex, because a
+    // vertex test on a 6.36-unit grid removes every quad merely touching
+    // the rect and blows the hole out to two quads either side. The
+    // centroid rect in exitLayout is authored against this tessellation
+    // so it removes exactly the block the shaft needs, and the exit's
+    // apron is sized to cover that block's quantised edge. The second
+    // test is insurance for a finer ground: any face with a vertex
+    // strictly inside the shaft footprint goes too. At 220 segments no
+    // vertex qualifies, so today it removes nothing.
+    const index = g.getIndex();
+    const kept = [];
+    for (let f = 0; f < index.count; f += 3) {
+      const a = index.getX(f);
+      const b = index.getX(f + 1);
+      const c = index.getX(f + 2);
+      let inside = false;
+      let cx = 0;
+      let cz = 0;
+      for (const v of [a, b, c]) {
+        const vx = pos.getX(v);
+        const vz = GROUND_CENTER_Z - pos.getY(v);
+        cx += vx / 3;
+        cz += vz / 3;
+        if (
+          vx > EXIT_SHAFT_RECT.x0 &&
+          vx < EXIT_SHAFT_RECT.x1 &&
+          vz > EXIT_SHAFT_RECT.z0 &&
+          vz < EXIT_SHAFT_RECT.z1
+        ) {
+          inside = true;
+        }
+      }
+      if (
+        cx > EXIT_GROUND_HOLE.x0 &&
+        cx < EXIT_GROUND_HOLE.x1 &&
+        cz > EXIT_GROUND_HOLE.z0 &&
+        cz < EXIT_GROUND_HOLE.z1
+      ) {
+        inside = true;
+      }
+      if (!inside) kept.push(a, b, c);
+    }
+    g.setIndex(kept);
+
     g.computeVertexNormals();
     return g;
   }, []);
@@ -243,8 +303,10 @@ const backdropFragment = /* glsl */ `
   uniform vec3 horizonColor;
   uniform vec3 zenithColor;
   uniform vec3 transitionColor;
+  uniform vec3 undergroundColor;
   uniform vec3 glowColor;
   uniform float reveal;
+  uniform float sink;
   uniform float radius;
   varying vec3 vLocal;
 
@@ -272,12 +334,20 @@ const backdropFragment = /* glsl */ `
     c += glowColor * horizonHug * (downRoute * 0.85 + rakeSide * 0.3);
 
     c = mix(transitionColor, c, reveal);
+    // The sky does not survive going underground. The sink uniform is the
+    // exit route's own progress into the stairwell (see exitLayout's
+    // exitSink): the fog resolves to the same value over the same window,
+    // so the backdrop — which is fog-exempt by construction, being the
+    // value fog resolves TO — has to be taken down explicitly or it would
+    // keep showing a horizon through a doorway the camera has already
+    // walked past.
+    c = mix(c, undergroundColor, sink);
     gl_FragColor = vec4(c, 1.0);
     #include <colorspace_fragment>
   }
 `;
 
-function Backdrop({ arrival, arrivalProgressRef }) {
+function Backdrop({ arrival, arrivalProgressRef, exitProgressRef }) {
   const meshRef = useRef(null);
   const radius = 500;
 
@@ -290,8 +360,10 @@ function Backdrop({ arrival, arrivalProgressRef }) {
           horizonColor: { value: new THREE.Color(HORIZON) },
           zenithColor: { value: new THREE.Color(ZENITH) },
           transitionColor: { value: new THREE.Color("#0d1112") },
+          undergroundColor: { value: new THREE.Color(UNDERGROUND_DARK) },
           glowColor: { value: new THREE.Color(SKY_GLOW) },
           reveal: { value: 0 },
+          sink: { value: 0 },
           radius: { value: radius },
         },
         side: THREE.BackSide,
@@ -311,6 +383,9 @@ function Backdrop({ arrival, arrivalProgressRef }) {
     meshRef.current.position.set(camera.position.x, 0, camera.position.z);
     const raw = arrival ? THREE.MathUtils.clamp(arrivalProgressRef?.current ?? 1, 0, 1) : 1;
     meshRef.current.material.uniforms.reveal.value = arrival ? Math.pow(raw, 3.2) : 1;
+    meshRef.current.material.uniforms.sink.value = exitSink(
+      THREE.MathUtils.clamp(exitProgressRef?.current ?? 0, 0, 1),
+    );
   });
 
   return (
@@ -469,10 +544,18 @@ const FALLEN = [
   { position: [-4, -206], length: 24, yaw: 0.52, pitch: -0.3, sink: 1.2, breakAt: 15 },
 ];
 
-export default function GraveyardArchitecture({ arrival = false, arrivalProgressRef }) {
+export default function GraveyardArchitecture({
+  arrival = false,
+  arrivalProgressRef,
+  exitProgressRef,
+}) {
   return (
     <group>
-      <Backdrop arrival={arrival} arrivalProgressRef={arrivalProgressRef} />
+      <Backdrop
+        arrival={arrival}
+        arrivalProgressRef={arrivalProgressRef}
+        exitProgressRef={exitProgressRef}
+      />
       <Ground />
       {TOWERS.map((tower, i) => (
         <RelayTower key={`t${i}`} {...tower} />

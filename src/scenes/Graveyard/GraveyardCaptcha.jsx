@@ -116,18 +116,38 @@ const CONCRETE_DARK = "#101315";
 //
 // The second line inverts the Prelude's own "1 NODE RESPONDED". At the
 // start of the experience exactly one node answered; here none do.
+const FAILED_STATUS = [
+  "VERIFICATION SERVICE UNAVAILABLE",
+  "no verification node responded",
+];
+// Once the machine has failed it KEEPS reporting the failure, unchanged,
+// through every remaining phase — including the ones in which the service
+// door opens and the visitor walks away down the stairs. Nothing about
+// the exit is the machine relenting; it is still saying the same sentence
+// to nobody while the camera leaves.
 const STATUS = {
   verifying: ["VERIFYING...", null],
   reaching: ["VERIFYING HUMAN RESPONSE...", null],
-  failed: ["VERIFICATION SERVICE UNAVAILABLE", "no verification node responded"],
-  warming: ["VERIFICATION SERVICE UNAVAILABLE", "no verification node responded"],
-  leaving: ["VERIFICATION SERVICE UNAVAILABLE", "no verification node responded"],
+  failed: FAILED_STATUS,
+  seam: FAILED_STATUS,
+  opening: FAILED_STATUS,
+  descending: FAILED_STATUS,
+  leaving: FAILED_STATUS,
 };
+const FAILED_PHASES = new Set(["failed", "seam", "opening", "descending", "leaving"]);
 // Once the visitor has ticked the box it STAYS ticked, including through
 // the failure. The human asserted themselves; it is the machine that
 // cannot confirm it. Draining the tick back out would have read as the
 // visitor's input being rejected.
-const TICKED = new Set(["verifying", "reaching", "failed", "warming", "leaving"]);
+const TICKED = new Set([
+  "verifying",
+  "reaching",
+  "failed",
+  "seam",
+  "opening",
+  "descending",
+  "leaving",
+]);
 
 // The checkbox row's extent on the 1024x640 canvas. Exported as fractions
 // because the hit target in world space is derived from exactly these
@@ -201,9 +221,7 @@ function drawInterface(ctx, phase) {
     ctx.font = "40px 'Courier New', monospace";
     // The failure reads no louder than the prompt above it. No red, no
     // emphasis — the machine reports it the way it would report anything.
-    ctx.fillStyle = phase === "failed" || phase === "warming" || phase === "leaving"
-      ? "#9aa6aa"
-      : "#a9b5b9";
+    ctx.fillStyle = FAILED_PHASES.has(phase) ? "#9aa6aa" : "#a9b5b9";
     ctx.fillText(status[0], 512, 528);
     if (status[1]) {
       ctx.font = "30px 'Courier New', monospace";
@@ -360,7 +378,12 @@ function InterfacePanel({ progressRef, reduceMotion, phase, onActivate }) {
 // rises somewhere behind the visitor's shoulder. Ramped in useFrame from
 // the phase rather than tweened by GSAP: this is continuous scene state,
 // and keeping GSAP to the discrete beats is the project's standing rule.
-const SPOT_BY_PHASE = { warming: 0.42, leaving: 0.12 };
+// The machine visibly stops holding itself up across the whole exit: the
+// uplight steps down as the seam appears, again as the door opens, and
+// again as the camera walks away, so by the time the visitor is at the
+// threshold the monument behind them is close to unlit. It is not
+// switching off — it is losing the frame.
+const SPOT_BY_PHASE = { seam: 0.48, opening: 0.34, descending: 0.16, leaving: 0.1 };
 
 function MonumentLight({ spotRef, phase, reduceMotion }) {
   useFrame((_, delta) => {
