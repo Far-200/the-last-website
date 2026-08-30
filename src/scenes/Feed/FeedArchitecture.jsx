@@ -84,6 +84,38 @@ const FLOOR_STONE = "#0e1211";
 const PATH_STONE = "#171c1b";
 const WALL_STONE = "#232a29";
 
+// How much of the dielectric specular lobe the floor keeps. This is the
+// one number that stops the ground out-valuing the architecture standing
+// on it, and it is not a taste setting — it was measured.
+//
+// Both floor planes are already at the roughness ceiling (1.0 / 0.94) and
+// metalness 0, so MeshStandardMaterial had nothing left to give: it
+// exposes no specular control at all, and roughness does not touch the
+// Fresnel term. The problem was never the diffuse response. FeedScene's
+// key is a back-light 8.4 degrees above horizontal travelling toward the
+// camera, and the camera sits at eye height looking down a flat plane —
+// textbook mirror geometry. Grazing Fresnel goes to F90 regardless of
+// roughness, so the floor was rendering as a broad specular sheen that
+// slid with the camera instead of a lit surface. Measured off the render
+// at mid-route: path 143, base floor 52, camera-facing column 40,
+// overhead vault 4 — the ground was the brightest broad surface in the
+// frame by 3.6x, everything standing on it read as a dark cut-out
+// against it, and the far floor washed pale straight through the fog.
+//
+// `specularIntensity` on MeshPhysicalMaterial scales both F0 and F90
+// (with metalness 0 it IS specularF90 — see three's
+// lights_physical_fragment), which is the only knob that reaches that
+// term. At 0.25 the same probes read path 63, base floor 15, column 40:
+// the sheen is halved, fog regains authority with distance, and debris
+// sits on the floor instead of against it. Lower is not better — by 0.20
+// the untouched FLOOR_STAINS/FeedInfrastructure scorch decals (still
+// fully specular, deliberately out of scope here) begin to out-value the
+// worn path, and at 0.0 the floor is identical to Lambert and vanishes
+// to RGB 1-3, because its diffuse illumination alone is genuinely
+// negligible. That remaining diffuse deficit is a separate problem; it is
+// NOT compensated for here with light changes.
+const FLOOR_SPECULAR = 0.25;
+
 // The floor is the single most load-bearing element in the scene: it is
 // what turns a void into a place. It runs the full length of the route
 // and well past the aperture so the surface never visibly terminates.
@@ -99,21 +131,35 @@ function Floor() {
         receiveShadow
       >
         <planeGeometry args={[WALL_X * 2, length]} />
-        <meshStandardMaterial color={FLOOR_STONE} roughness={1} metalness={0} />
+        <meshPhysicalMaterial
+          color={FLOOR_STONE}
+          roughness={1}
+          metalness={0}
+          specularIntensity={FLOOR_SPECULAR}
+        />
       </mesh>
 
       {/* A worn processional path down the centre — stone polished a
           value lighter by traffic that stopped a long time ago. This is
           the element that gives the eye a direction to follow, and it is
           a value change only: no lines, no markings, nothing that would
-          read as interface. */}
+          read as interface. It keeps a slightly lower roughness than the
+          surrounding floor, which is what "polished by traffic" means
+          here; with the sheen brought down to FLOOR_SPECULAR that
+          difference finally reads as a distinct band instead of being
+          lost inside a floor that was uniformly blown out. */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, FLOOR_Y + 0.012, centreZ]}
         receiveShadow
       >
         <planeGeometry args={[7.4, length]} />
-        <meshStandardMaterial color={PATH_STONE} roughness={0.94} metalness={0} />
+        <meshPhysicalMaterial
+          color={PATH_STONE}
+          roughness={0.94}
+          metalness={0}
+          specularIntensity={FLOOR_SPECULAR}
+        />
       </mesh>
     </group>
   );
