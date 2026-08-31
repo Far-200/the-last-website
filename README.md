@@ -48,10 +48,7 @@ It is a linear, progression-driven experience with a fixed emotional arc. There 
 <table>
   <tr>
     <td width="50%"><img src="./docs/readme/prelude.png" alt="A dark collapsed room lit only by a CRT monitor, with a packet capture printing beside it and a CONNECT TO SIGNAL control below" /><br /><sub><b>Prelude</b> — one surviving system, and a signal that is nearly gone.</sub></td>
-    <td width="50%"><img
-  src="https://github.com/Far-200/the-last-website/blob/main/docs/readme/feed.png?raw=true"
-  alt="A ruined corridor of servers and fallen screens, with a recovered group chat reading did you feed the cat, yeah, ok good"
-/><br /><sub><b>The Feed</b> — a group chat, recovered intact, about nothing.</sub></td>
+    <td width="50%"><img src="./docs/readme/feed.png" alt="A ruined corridor of servers and fallen screens, with a recovered group chat reading did you feed the cat, yeah, ok good" /><br /><sub><b>The Feed</b> — a group chat, recovered intact, about nothing.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="./docs/readme/memories.png" alt="A warmly lit desk with a lamp, a mug and a laptop showing an unsent draft reading are you still awake" /><br /><sub><b>Memories</b> — a draft, still open, never sent.</sub></td>
