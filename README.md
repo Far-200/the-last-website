@@ -20,7 +20,7 @@
 
 One server outlived the internet. It holds a partial, corrupted archive of ordinary human life, and it has been rebuilding its index for three thousand eight hundred and twenty-two days. You arrive as the first connection it has seen in that time, and you move through what it managed to keep.
 
-The archive is not a museum of technology. What survived is not the platforms — it's a group chat about whether the cat was fed, a voicemail that says *it's not urgent*, a draft that was never sent. The infrastructure is wreckage. The people are still legible inside it.
+The archive is not a museum of technology. What survived is not the platforms — it's a group chat about whether the cat was fed, a voicemail that says _it's not urgent_, a draft that was never sent. The infrastructure is wreckage. The people are still legible inside it.
 
 It is a linear, progression-driven experience with a fixed emotional arc. There is no free roam, no inventory, no score, and nothing to win. You go forward, the archive shows you what it has, and then the connection ends.
 
@@ -35,20 +35,23 @@ It is a linear, progression-driven experience with a fixed emotional arc. There 
   <sub>Uncertainty → Recognition → Desolation → Intimacy → Absence</sub>
 </p>
 
-**Prelude** — You wake on the floor of a collapsed room. One damaged console still has power. A dead network signal resolves into a single recovered fragment, then a recovery process wakes underneath it, then a document written by someone called a.kaplan: *IF ANYONE FINDS THIS—*. The rest is unrecoverable. You choose to enter the archive.
+**Prelude** — You wake on the floor of a collapsed room. One damaged console still has power. A dead network signal resolves into a single recovered fragment, then a recovery process wakes underneath it, then a document written by someone called a.kaplan: _IF ANYONE FINDS THIS—_. The rest is unrecoverable. You choose to enter the archive.
 
 **The Feed** — A long nave of broken information infrastructure: terminal stacks, fallen billboards, cable runs, overhead structure you pass beneath. Ordinary human conversation surfaces on the wreckage — recovered, fragmentary, and mundane enough to be real.
 
-**The Graveyard** — Open ground under a low sky, where the old web is buried in rows: *under construction, never finished*; *guestbooks, sign before you go*. A monument stands over the field: an enormous CAPTCHA asking you to prove you are human. You tick the box. The verification service is not there any more. Beside it, a door you hadn't noticed shows a thin line of warm light — the first warmth in the entire experience.
+**The Graveyard** — Open ground under a low sky, where the old web is buried in rows: _under construction, never finished_; _guestbooks, sign before you go_. A monument stands over the field: an enormous CAPTCHA asking you to prove you are human. You tick the box. The verification service is not there any more. Beside it, a door you hadn't noticed shows a thin line of warm light — the first warmth in the entire experience.
 
-**Memories** — Down the stairwell, a small room at human scale. A desk lamp still on, a mug, an unsent draft that reads *are you still awake*, an answering machine holding a message someone meant to return. Everything here was left by a person who expected to come back. Then the light goes out.
+**Memories** — Down the stairwell, a small room at human scale. A desk lamp still on, a mug, an unsent draft that reads _are you still awake_, an answering machine holding a message someone meant to return. Everything here was left by a person who expected to come back. Then the light goes out.
 
 **The Last Message** — One terminal, alone, in a space that has stopped. `FILES RECOVERED: 4. USERS ONLINE: 0. NETWORK: OFFLINE.` The finale plays on its own — a last line, a deliberate silence, blackout, `CONNECTION LOST`, and the thesis, once. Then `[ RECONNECT ]`, and the archive begins again.
 
 <table>
   <tr>
     <td width="50%"><img src="./docs/readme/prelude.png" alt="A dark collapsed room lit only by a CRT monitor, with a packet capture printing beside it and a CONNECT TO SIGNAL control below" /><br /><sub><b>Prelude</b> — one surviving system, and a signal that is nearly gone.</sub></td>
-    <td width="50%"><img src="./docs/readme/feed.png" alt="A ruined corridor of servers and fallen screens, with a recovered group chat reading did you feed the cat, yeah, ok good" /><br /><sub><b>The Feed</b> — a group chat, recovered intact, about nothing.</sub></td>
+    <td width="50%"><img
+  src="https://github.com/Far-200/the-last-website/blob/main/docs/readme/feed.png?raw=true"
+  alt="A ruined corridor of servers and fallen screens, with a recovered group chat reading did you feed the cat, yeah, ok good"
+/><br /><sub><b>The Feed</b> — a group chat, recovered intact, about nothing.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="./docs/readme/memories.png" alt="A warmly lit desk with a lamp, a mug and a laptop showing an unsent draft reading are you still awake" /><br /><sub><b>Memories</b> — a draft, still open, never sent.</sub></td>
@@ -89,7 +92,7 @@ No global state library, no post-processing stack, no backend. The archive is bu
 
 - **The world is the interface.** No HUD, no nav bar, no objective markers, no tutorial chrome.
 - **Restraint over spectacle.** Atmosphere comes from composition, scale, negative space, fog, silence and pacing — not from bloom and glitch.
-- **Ordinary over epic.** An unsent draft and *see you tomorrow* carry more than any lore would.
+- **Ordinary over epic.** An unsent draft and _see you tomorrow_ carry more than any lore would.
 - **One writer per value.** The scene's camera component is the sole continuous authority over the camera; GSAP times discrete beats and never fights the render loop for the same property.
 - **Each scene keeps its own character.** The five scenes are deliberately not interchangeable — different density, different color language, different camera behaviour, different ways of handing over to the next.
 - **The thesis is earned.** Inside the experience it appears exactly once, at the very end, and never as a preface.
@@ -121,7 +124,7 @@ The full design contract — thesis, emotional arc, area breakdown, non-goals an
 
 The environments, terminal copy and recovered fragments in the archive were written and built for this project.
 
-The soundtrack is *Melancholic* by Monume, used under the Pixabay Content License. Full asset attribution — including the Graveyard's grave-marker kit — is in [`docs/CREDITS.md`](./docs/CREDITS.md).
+The soundtrack is _Melancholic_ by Monume, used under the Pixabay Content License. Full asset attribution — including the Graveyard's grave-marker kit — is in [`docs/CREDITS.md`](./docs/CREDITS.md).
 
 Built on open-source work by others: React, Vite, Three.js, React Three Fiber, Drei and GSAP.
 
