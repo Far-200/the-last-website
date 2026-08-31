@@ -59,10 +59,14 @@ function usePrefersReducedMotion() {
 
 // Mirrors each step of PROJECT_PLAN.md section 4.1 by name, so the
 // mapping between that document and this code is legible without
-// cross-referencing line numbers. Steps 3 ("ambient sound drains") and
-// the audio half of step 6 are intentionally absent — full audio is
-// deferred project-wide (see CLAUDE.md); nothing here precludes wiring
-// `useAudioEngine` fades to these same `goto` calls later.
+// cross-referencing line numbers. Step 3 ("ambient sound drains") is
+// now wired: it is not a phase, because nothing about it is visible —
+// it is a single call on the timeline at the position the plan gives
+// it, between the status beat and "See you tomorrow.", handed up to
+// App's soundtrack engine through onSoundtrackDrain. This scene owns
+// only WHEN the drain happens; it owns no audio instance and cannot
+// restart one. The audio half of step 6 (a terminal-failure cue) stays
+// absent — project-wide SFX remain deferred.
 //
 //   arriving      step 1 — reached the terminal; almost nothing yet
 //   signal        the screen wakes — a weak surviving signal
@@ -92,11 +96,21 @@ const PHASE_NARRATION = {
   ended: "The line fades. A faint reconnect control is now available.",
 };
 
-export default function LastMessage({ onRestart }) {
+export default function LastMessage({ onRestart, onSoundtrackDrain }) {
   const reduceMotion = usePrefersReducedMotion();
   const veilRef = useRef(null);
   const timelineRef = useRef(null);
   const [phase, setPhase] = useState("arriving");
+
+  // Held in a ref, and read only from inside the timeline, so that a
+  // change of callback identity can never land in the finale effect's
+  // dependencies and rebuild the authored sequence mid-play. Seeded at
+  // mount (which is the only value the timeline can ever need) and kept
+  // current from an effect rather than during render.
+  const drainRef = useRef(onSoundtrackDrain);
+  useEffect(() => {
+    drainRef.current = onSoundtrackDrain;
+  }, [onSoundtrackDrain]);
 
   useEffect(() => {
     // "Do not rush. This is one of the few places where a several-second
@@ -114,6 +128,7 @@ export default function LastMessage({ onRestart }) {
           message: 2.2,
           silence: 1.4,
           failing: 0.7,
+          drain: 2.4,
           veilOut: 0.35,
           postBlackout: 0.7,
           connectionLost: 1.6,
@@ -128,6 +143,7 @@ export default function LastMessage({ onRestart }) {
           message: 3.6,
           silence: 2.8,
           failing: 1.6,
+          drain: 4.2,
           veilOut: 0.4,
           postBlackout: 1.1,
           connectionLost: 2.2,
@@ -151,6 +167,22 @@ export default function LastMessage({ onRestart }) {
     step("arriving", d.arriving);
     step("signal", d.signal);
     step("status", d.status);
+
+    // Step 3 — "ambient sound drains toward near-silence". Exactly
+    // where the plan puts it: after the status line has resolved and
+    // before "See you tomorrow." arrives. It begins partway back into
+    // the status hold so the drain is already underway when the message
+    // lands, and its length carries it across the message beat — which
+    // makes step 5's "deliberate beat of true silence" literally
+    // silent, and leaves the blackout, CONNECTION LOST and the thesis
+    // with nothing playing under them at all.
+    //
+    // This adds no phase, no visible state and no time. It is a
+    // zero-duration callback inserted into an existing hold via a
+    // relative position, so the timeline's duration — and therefore
+    // every text timing after it — is byte-for-byte what it was.
+    tl.call(() => drainRef.current?.(d.drain), null, `-=${d.status * 0.5}`);
+
     step("message", d.message);
     step("silence", d.silence);
     step("failing", d.failing);

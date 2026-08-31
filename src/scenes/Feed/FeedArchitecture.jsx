@@ -394,14 +394,19 @@ const VAULTS = [
 // markings" rule as the worn-path strip in Floor(): irregular rotation
 // so edges never align with the path direction, and never so dark it
 // reads as a shadow with a light source implied above it.
+// Keep these a few millimetres above the base floor: when they were
+// exactly coplanar at y=0, the depth buffer could alternate between
+// stain and floor as the camera advanced, reading as a flickering
+// shadow. They stay below the worn path at y=0.012.
+const FLOOR_STAIN_Y = FLOOR_Y + 0.004;
 const FLOOR_STAINS = [
-  { position: [-5.4, 0, -11], rotation: [-Math.PI / 2, 0, 0.4], size: [5.5, 6.2], color: "#111614" },
-  { position: [4.8, 0, -19], rotation: [-Math.PI / 2, 0, -0.6], size: [4.4, 5.8], color: "#1c2321" },
-  { position: [-3.6, 0, -37], rotation: [-Math.PI / 2, 0, 0.15], size: [6.5, 4.8], color: "#151b19" },
-  { position: [5.6, 0, -70], rotation: [-Math.PI / 2, 0, -0.3], size: [5, 6.6], color: "#111614" },
-  { position: [-6.0, 0, -90], rotation: [-Math.PI / 2, 0, 0.55], size: [5.8, 5], color: "#1c2321" },
-  { position: [3.2, 0, -109], rotation: [-Math.PI / 2, 0, -0.2], size: [6.8, 5.4], color: "#151b19" },
-  { position: [-4.4, 0, -122], rotation: [-Math.PI / 2, 0, 0.35], size: [5.2, 6], color: "#111614" },
+  { position: [-5.4, FLOOR_STAIN_Y, -11], rotation: [-Math.PI / 2, 0, 0.4], size: [5.5, 6.2], color: "#111614" },
+  { position: [4.8, FLOOR_STAIN_Y, -19], rotation: [-Math.PI / 2, 0, -0.6], size: [4.4, 5.8], color: "#1c2321" },
+  { position: [-3.6, FLOOR_STAIN_Y, -37], rotation: [-Math.PI / 2, 0, 0.15], size: [6.5, 4.8], color: "#151b19" },
+  { position: [5.6, FLOOR_STAIN_Y, -70], rotation: [-Math.PI / 2, 0, -0.3], size: [5, 6.6], color: "#111614" },
+  { position: [-6.0, FLOOR_STAIN_Y, -90], rotation: [-Math.PI / 2, 0, 0.55], size: [5.8, 5], color: "#1c2321" },
+  { position: [3.2, FLOOR_STAIN_Y, -109], rotation: [-Math.PI / 2, 0, -0.2], size: [6.8, 5.4], color: "#151b19" },
+  { position: [-4.4, FLOOR_STAIN_Y, -122], rotation: [-Math.PI / 2, 0, 0.35], size: [5.2, 6], color: "#111614" },
 ];
 
 // Thin fracture lines. Deliberately not aligned with the path or with

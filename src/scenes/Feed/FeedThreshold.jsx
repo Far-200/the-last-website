@@ -88,6 +88,11 @@ const RUBBLE = [
 
 function Ring({ z, depth, gap, jambWidth, height, head }) {
   const jambCentre = gap + jambWidth / 2;
+  // The lintel overlaps each jamb slightly in X to keep the joint closed.
+  // Give it a tiny extra Z depth so those overlapping front/back faces are
+  // not coplanar with the jambs; otherwise the moving camera exposes
+  // depth-buffer z-fighting at the beam ends during the departure.
+  const headDepth = depth + 0.04;
   return (
     <group position={[0, FLOOR_Y, z]}>
       {[-1, 1].map((side) => (
@@ -97,7 +102,7 @@ function Ring({ z, depth, gap, jambWidth, height, head }) {
         </mesh>
       ))}
       <mesh position={[0, (head[0] + head[1]) / 2, 0]}>
-        <boxGeometry args={[gap * 2 + 1.2, head[1] - head[0], depth]} />
+        <boxGeometry args={[gap * 2 + 1.2, head[1] - head[0], headDepth]} />
         <meshStandardMaterial color={STONE_MID} roughness={0.98} metalness={0.04} />
       </mesh>
     </group>

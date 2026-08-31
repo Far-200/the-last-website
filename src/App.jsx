@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import useAudioEngine from "./audio/useAudioEngine";
 import Prelude from "./scenes/Prelude/Prelude";
 import Feed from "./scenes/Feed/Feed";
 import Graveyard from "./scenes/Graveyard/Graveyard";
@@ -50,8 +51,28 @@ import LastMessage from "./scenes/LastMessage/LastMessage";
 // fresh Prelude, and every scene's own state (phase, refs, GSAP
 // timelines) is freshly initialized by construction — no manual reset
 // logic is needed anywhere else.
+//
+// The one thing App owns beyond scene identity is the soundtrack. That
+// is not a global-state exception: it is the direct consequence of the
+// rule above. Because App itself never unmounts while a scene swap
+// does, App is the only place in the tree where a single continuous
+// audio instance can survive Prelude -> Feed -> Graveyard -> Memories
+// -> LastMessage. useAudioEngine holds one HTMLAudioElement outside the
+// React tree (see that file); App passes down only two callbacks, at
+// the two moments the narrative asks for:
+//
+//   onSoundtrackStart   Prelude, synchronously inside the CONNECT click
+//                       itself — the browser's autoplay unlock gesture.
+//                       Deliberately NOT onConnected, which fires much
+//                       later, after Prelude's leaving dolly, by which
+//                       point the user gesture no longer counts.
+//   onSoundtrackDrain   LastMessage, at step 3 of the canonical finale
+//                       ("ambient sound drains toward near-silence").
+//
+// No scene owns playback, and no scene can restart it.
 export default function App() {
   const [scene, setScene] = useState("prelude");
+  const soundtrack = useAudioEngine();
 
   const handleConnected = useCallback(() => {
     setScene("feed");
@@ -73,7 +94,11 @@ export default function App() {
     setScene("prelude");
   }, []);
 
-  if (scene === "lastMessage") return <LastMessage onRestart={handleRestart} />;
+  if (scene === "lastMessage") {
+    return (
+      <LastMessage onRestart={handleRestart} onSoundtrackDrain={soundtrack.drain} />
+    );
+  }
   if (scene === "memories") {
     return <Memories onMemoriesComplete={handleMemoriesComplete} />;
   }
@@ -81,5 +106,5 @@ export default function App() {
     return <Graveyard onVerificationComplete={handleVerificationComplete} />;
   }
   if (scene === "feed") return <Feed onThresholdCrossed={handleThresholdCrossed} />;
-  return <Prelude onConnected={handleConnected} />;
+  return <Prelude onConnected={handleConnected} onSoundtrackStart={soundtrack.start} />;
 }

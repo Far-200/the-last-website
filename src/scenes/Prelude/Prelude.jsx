@@ -59,7 +59,7 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-export default function Prelude({ onConnected }) {
+export default function Prelude({ onConnected, onSoundtrackStart }) {
   const [phase, setPhase] = useState("awakening");
   const [systemRevealStep, setSystemRevealStep] = useState(0);
   const reduceMotion = usePrefersReducedMotion();
@@ -285,10 +285,19 @@ export default function Prelude({ onConnected }) {
     step(() => setPhase("archive"), 0);
   }, [reduceMotion]);
 
+  // The CONNECT click is the project's audio unlock, and this is the
+  // only place it can be. It has to run synchronously inside the real
+  // click for the browser to honour play(); onConnected fires a whole
+  // sequence and a second, separate [ ENTER ARCHIVE ] click later, by
+  // which point this gesture is long expired. onConnected therefore
+  // still means exactly what it meant before — the scene-completion
+  // boundary into Feed — and this is a separate, earlier signal that
+  // happens to share the same click.
   const handleConnect = useCallback(() => {
     if (phase !== "signal") return;
+    onSoundtrackStart?.();
     runSequence();
-  }, [phase, runSequence]);
+  }, [phase, runSequence, onSoundtrackStart]);
 
   // The Prelude -> Feed match cut. Under full motion this is a real
   // forward dolly (see LeavingDolly in PreludeScene.jsx): the camera
